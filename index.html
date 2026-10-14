@@ -449,7 +449,7 @@ async function runOcr(img){
     if(kind==='支払' && g.partner && !$('pPartner').value.trim()) put('pPartner',g.partner,'支払先');
     if(got.length){ msg.className='hint ok'; msg.textContent=`✔ ${got.join('・')}を読み取りました。黄色の欄が正しいか確認してください（違えば直接修正）。`; }
     else { msg.className='hint'; msg.textContent='読み取れませんでした。手入力してください。'; }
-  }catch(e){ msg.className='hint'; msg.textContent='自動読み取りは使えませんでした（手入力してください）'; }
+  }catch(e){ msg.className='hint'; msg.textContent='自動読み取りは使えませんでした（手入力してください）【'+(e&&e.message||e)+'】'; }
 }
 function z2h(t){ return t.replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[，、]/g,',').replace(/[．。]/g,'.').replace(/[／]/g,'/').replace(/[－―‐]/g,'-').replace(/(\d)ー(?=\d)/g,'$1-').replace(/[￥\\]/g,'¥').replace(/[：]/g,':').replace(/\u3000/g,' '); }
 function parseReceipt(raw){
