@@ -54,6 +54,11 @@ textarea{min-height:64px}
 .auto{background:#fff6cc!important;border-color:#e0b100!important}
 #ocrMsg.run{color:var(--blue)}
 #ocrMsg.ok{color:var(--teal);font-weight:bold}
+.grp{border:1px solid var(--line);border-radius:10px;margin:12px 0;overflow:hidden;background:#fff}
+.grph{background:var(--navy);color:#fff;padding:8px 12px;font-weight:bold;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.grpc{background:#f2f9f8;padding:10px 12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line)}
+.grpc .blk{min-width:150px}
+.grp table{border:none}
 .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .thumbs div{position:relative}
 .thumbs img,.thumbs .pdf{width:68px;height:68px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
@@ -184,6 +189,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
               <label class="f">現金有高表の写真</label>
               <div class="pick"><label class="btn ok">📷 カメラで撮影<input type="file" id="fCntCam" accept="image/*" capture="environment"></label><label class="btn sub">🖼 写真から選ぶ<input type="file" id="fCnt" accept="image/*" multiple></label></div>
               <div class="thumbs" id="tCnt"></div>
+              <div id="cntOcrMsg" class="hint"></div>
               <p class="hint" id="cntHint">現金を数えてから撮影してください（原則3：実査先行）。</p>
             </div>
           </div>
@@ -243,14 +249,14 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
         <div class="noprint" style="text-align:right"><button class="btn sm sub" onclick="hqRefresh()">🔄 最新の情報に更新</button></div>
         <div class="tabs" id="htabs">
           <button data-t="journal" class="on">受付・入力</button>
-          <button data-t="counts">有高照合</button>
           <button data-t="month">月次・開示</button>
           <button data-t="reports">申請・報告</button>
           <button data-t="setting">繰越設定</button>
         </div>
 
         <div id="h-journal" class="card">
-          <h2>受付・入力（勘定奉行への入力）</h2>
+          <h2>受付・入力・有高照合</h2>
+          <p class="muted">店舗から届いた取引を勘定奉行に入力 → 事業所・日ごとに<b>奉行の元帳残高</b>を入れて、店舗の有高と照合した結果を返信します。</p>
           <div class="row noprint">
             <div><label class="f">事業所</label><select id="jStore" class="hqStoreSel"></select></div>
             <div><label class="f">対象月（空欄=全期間）</label><input type="month" id="jMonth"></div>
@@ -258,9 +264,8 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
             <div><label class="f">状態</label><select id="jStatus"><option>未処理</option><option>差戻し</option><option value="入力済">本社処理済</option><option value="確認済">店舗確認済</option><option>すべて</option></select></div>
             <div style="align-self:flex-end"><button class="btn" onclick="loadJournal()">表示</button></div>
           </div>
-          <div id="latestBox" style="margin-top:10px"></div>
           <div id="journalBox" style="margin-top:10px"></div>
-          <button class="btn big hide" id="journalSave" onclick="saveJournal()">チェックした行を「本社処理済」にする（店舗へ確認依頼）</button>
+          <button class="btn big hide" id="journalSave" onclick="saveJournal()">チェックした取引をすべて「本社処理済」にして、入力した元帳残高を返信</button>
         </div>
 
         <div id="h-counts" class="card hide">
@@ -365,7 +370,7 @@ async function start(){
   setupTabs('stabs','s-',onStoreTab); setupTabs('htabs','h-',onHqTab);
   document.querySelectorAll('#kinds button').forEach(b=>b.onclick=()=>selectKind(b.dataset.k));
   document.querySelectorAll('input[name=cntMode]').forEach(r=>r.onchange=paintKind);
-  $('pDate').addEventListener('input',()=>{dateTouched=true;}); ['pDate','pAmount','pPartner'].forEach(id=>$(id).addEventListener('input',()=>$(id).classList.remove('auto')));
+  $('pDate').addEventListener('input',()=>{dateTouched=true;}); ['pDate','pAmount','pPartner','pMemo','cTotal'].forEach(id=>$(id).addEventListener('input',()=>$(id).classList.remove('auto')));
   $('fEv').onchange=e=>addFiles(e,'ev'); $('fCnt').onchange=e=>addFiles(e,'cnt'); $('fEvCam').onchange=e=>addFiles(e,'ev'); $('fCntCam').onchange=e=>addFiles(e,'cnt');
   ['pAmount','cTotal','rNow','rAsk'].forEach(id=>$(id).addEventListener('blur',()=>{const v=$(id).value.trim();if(v!=='')$(id).value=num(v).toLocaleString()}));
   try{ const p=sessionStorage.getItem('keiri_hq'); if(p) hqPass=p; }catch(e){}
@@ -400,6 +405,7 @@ async function addFiles(ev,k){
   drawThumbs(k);
   const img=pend[k][before];
   if(k==='ev' && img && img.startsWith('data:image') && !editing && (kind==='支払'||kind==='収受')) runOcr(img);
+  if(k==='cnt' && img && img.startsWith('data:image')) runCountOcr(img);
 }
 function compress(file){
   return new Promise((resolve,reject)=>{
@@ -443,6 +449,31 @@ const imgLink = ids => ids ? `<span class="link" onclick="showImages('${esc(ids)
 
 /* ===== OCR（写真から日付・金額・支払先を読み取り） ===== */
 let dateTouched=false, lastOcrText='';
+/* 現金有高表（手書き）→ Geminiで読み取り（有高表のみ。領収書は送らない） */
+let lastCnt=null;
+async function runCountOcr(img){
+  const msg=$('cntOcrMsg'); msg.className='hint run'; msg.textContent='🔍 有高表を読み取り中…（10秒ほどかかります）';
+  try{
+    const r=await api('ocrCount',{image:img,date:$('pDate').value},true); lastCnt=r;
+    const n=k=>Number(r[k])||0;
+    const bills=n('y10000')+n('y5000')+n('y2000')+n('y1000'), coins=n('y500')+n('y100')+n('y50')+n('y10')+n('y5')+n('y1');
+    const total=n('grand')||n('total');
+    const checks=[bills===n('bills'), coins===n('coins'), n('bills')+n('coins')===n('total'), !n('grand')||n('grand')===n('total')];
+    const okAll=checks.every(Boolean);
+    const el=$('cTotal');
+    if(total>0 && (!el.value.trim()||el.classList.contains('auto'))){ el.value=total.toLocaleString(); el.classList.add('auto'); }
+    const dd=r.date?`「${esc(r.date)}」の列：`:'';
+    const link=' <span class="link" onclick="showCntDetail()">内訳を見る</span>';
+    if(okAll && r.confidence!=='low'){ msg.className='hint ok'; msg.innerHTML=`✔ ${dd}総計 ${yen(total)}（検算OK）。有高表と同じか確認してください。${link}`; }
+    else { msg.className='hint'; msg.innerHTML=`<span class="ng">⚠ ${dd}総計 ${yen(total)} と読み取りましたが、${okAll?'読み取りに自信がありません':'小計・合計の検算が合いません'}。必ず有高表を見て金額を確認・修正してください。</span>${link}`; }
+  }catch(e){ msg.className='hint'; msg.textContent='自動読み取りは使えませんでした（手入力してください）【'+(e&&e.message||e)+'】'; }
+}
+function showCntDetail(){
+  const r=lastCnt||{}; const n=k=>Number(r[k])||0;
+  const rows=[['一万円','y10000'],['五千円','y5000'],['二千円','y2000'],['千円','y1000'],['小計','bills'],['500円','y500'],['100円','y100'],['50円','y50'],['10円','y10'],['5円','y5'],['1円','y1'],['小計','coins'],['合計','total'],['総計','grand']];
+  $('modalBody').innerHTML=`<h3 style="margin:0 0 6px">読み取った内訳 ${esc(r.date||'')}</h3><table style="max-width:320px">`+rows.map(([l,k])=>`<tr${/計/.test(l)?' style="font-weight:bold"':''}><td>${l}</td><td class="n">${yen(n(k))}</td></tr>`).join('')+`</table><p class="muted">確信度: ${esc(r.confidence||'-')}</p>`;
+  $('modal').style.display='flex';
+}
 function showOcrText(){ $('modalBody').innerHTML='<h3 style="margin:0 0 6px">読み取った文字</h3><pre style="white-space:pre-wrap;font-size:12px">'+esc(lastOcrText)+'</pre>'; $('modal').style.display='flex'; }
 // 寿リハ（Rehab Cloud）の利用者向け領収書
 function parseRehab(lines,text,ok){
@@ -561,7 +592,7 @@ function calcRefill(){ const n=num($('rNow').value); if($('rNow').value.trim()!=
 function resetPost(keepKind){
   editing=null; keepImages=[]; pend.ev=[]; pend.cnt=[]; drawThumbs('ev'); drawThumbs('cnt');
   ['pAmount','pPartner','pMemo','cTotal','cInspector','rNow','rAsk','rText','dAmt','dText'].forEach(id=>$(id).value='');
-  $('noEv').checked=false; $('pDate').value=today(); dateTouched=false; document.querySelector('input[name=cntMode][value=now]').checked=true;
+  $('noEv').checked=false; $('cntOcrMsg').textContent=''; $('cntOcrMsg').className='hint'; lastCnt=null; $('pDate').value=today(); dateTouched=false; document.querySelector('input[name=cntMode][value=now]').checked=true;
   $('ocrMsg').textContent=''; $('ocrMsg').className='hint'; document.querySelectorAll('.auto').forEach(e=>e.classList.remove('auto'));
   $('editInfo').classList.add('hide'); $('pCancel').classList.add('hide'); $('postTitle').textContent='投稿';
   $('cntChoice').classList.remove('hide');
@@ -777,63 +808,102 @@ const hq = (a,p,q) => api(a,Object.assign({pass:hqPass,by:$('hqName').value.trim
 function onHqTab(t){ ({journal:loadJournal,counts:loadCounts,month:loadMonth,reports:loadReports,setting:loadCarry})[t](); }
 
 /* 受付・入力 */
-let jRows=[];
+let jRows=[], jGroups=[];
 async function loadJournal(){
-  const jd=$('jDate').value;
-  jRows = await hq('hqList',{store:$('jStore').value,month:jd?jd.slice(0,7):$('jMonth').value,status:$('jStatus').value});
-  if(jd) jRows=jRows.filter(o=>o.日付===jd);
+  const jd=$('jDate').value, st=$('jStore').value, month=jd?jd.slice(0,7):$('jMonth').value, status=$('jStatus').value;
+  const [rows,cnts]=await Promise.all([hq('hqList',{store:st,month,status}), hq('hqCounts',{store:st,month},true)]);
+  jRows=rows.filter(o=>!jd||o.日付===jd);
   jRows.sort((a,b)=>(a.日付+a.店舗+a.登録日時)<(b.日付+b.店舗+b.登録日時)?-1:1);
+  // 事業所×日 でまとめる
+  const g={};
+  const key=(d,s)=>d+'|'+s;
+  jRows.forEach((o,i)=>{ const k=key(o.日付,o.店舗); (g[k]=g[k]||{date:o.日付,store:o.店舗,idx:[],counts:[]}).idx.push(i); });
+  const cs=cnts.filter(c=>!jd||c.日付===jd);
+  // 取引のない日でも、未照合の有高がある日（「すべて」なら全部）は表示
+  cs.forEach(c=>{ const k=key(c.日付,c.店舗); if(!g[k] && (status==='すべて'||(status==='未処理'&&!c.照合))) g[k]={date:c.日付,store:c.店舗,idx:[],counts:[]}; });
+  cs.forEach(c=>{ const k=key(c.日付,c.店舗); if(g[k]) g[k].counts.push(c); });
+  jGroups=Object.values(g).sort((a,b)=>(a.date+a.store)<(b.date+b.store)?-1:1);
   const ac=M.accounts;
   const opt=(t,cur)=>{ const k=IN[t]?'収受':'支払';
     return '<option value="">（未選択）</option>'+ac.filter(a=>a.kind===k||a.kind==='共通'||!a.kind).map(a=>`<option ${a.name===cur?'selected':''}>${esc(a.name)}</option>`).join('')+(cur&&!ac.some(a=>a.name===cur)?`<option selected>${esc(cur)}</option>`:''); };
-  let h=`<p class="muted">${jRows.length}件　※勘定奉行へ入力したらチェックして「本社処理済」に（店舗に確認依頼が届きます）。科目・金額を変えるとチェックが入ります。</p><div class="tw"><table><thead><tr><th><input type="checkbox" style="width:auto" onclick="document.querySelectorAll('.jk').forEach(c=>c.checked=this.checked)"></th><th>日付</th><th>事業所</th><th>区分</th><th>相手先</th><th>内容</th><th>金額</th><th>証憑</th><th>勘定科目</th><th>補助</th><th>本社メモ</th><th>状態</th><th></th></tr></thead><tbody>`;
-  let prevD='';
-  jRows.forEach((o,i)=>{
-    if(o.日付!==prevD){ prevD=o.日付; const n=jRows.filter(x=>x.日付===o.日付).length; h+=`<tr class="cnt"><td colspan="13"><b>📅 ${o.日付}</b>（${n}件）</td></tr>`; }
-    h+=`<tr><td class="c"><input type="checkbox" class="jk" data-i="${i}" style="width:auto"></td><td class="d">${o.日付}</td><td>${esc(o.店舗)}</td><td class="c">${typeTxt(o.区分)}</td>
-    <td>${esc(o.相手先)}</td><td>${esc(o.摘要)}<div class="muted">${esc(o.登録者)} ${esc(o.登録日時.slice(5,16))}</div></td>
-    <td><input class="s" id="ja${i}" value="${o.金額}" style="width:86px;text-align:right" onchange="chk(${i})"></td><td class="c">${imgLink(o.画像ID)}</td>
-    <td><select class="acct" id="jc${i}" onchange="chk(${i})">${opt(o.区分,o.勘定科目)}</select></td>
-    <td><input class="s" id="js${i}" value="${esc(o.補助科目)}" onchange="chk(${i})"></td>
-    <td><input class="s" id="jm${i}" value="${esc(o.本社メモ)}" onchange="chk(${i})"></td>
-    <td class="c">${kindBadge(o.状態)}</td><td><button class="btn sm danger" onclick="returnEntry(${i})">差戻し</button></td></tr>`;
+  let h=`<p class="muted">${jGroups.length}グループ（取引 ${jRows.length}件）　※科目・金額を変えるとチェックが入ります。</p>`;
+  if(!jGroups.length) h+='<p class="muted">該当なし</p>';
+  jGroups.forEach((G,gi)=>{
+    const c=G.counts.sort((a,b)=>(b.登録日時)<(a.登録日時)?-1:1)[0]; G.latest=c;
+    h+=`<div class="grp"><div class="grph"><span>📅 ${esc(G.date)}</span><span>🏪 ${esc(G.store)}</span><span style="font-weight:normal">取引 ${G.idx.length}件</span></div>`;
+    if(G.idx.length){
+      h+=`<div class="tw"><table><thead><tr><th><input type="checkbox" style="width:auto" onclick="document.querySelectorAll('.jk[data-g=\'${gi}\']').forEach(x=>x.checked=this.checked)"></th><th>区分</th><th>相手先</th><th>内容</th><th>金額</th><th>証憑</th><th>勘定科目</th><th>補助</th><th>本社メモ</th><th>状態</th><th></th></tr></thead><tbody>`;
+      G.idx.forEach(i=>{ const o=jRows[i];
+        h+=`<tr><td class="c"><input type="checkbox" class="jk" data-i="${i}" data-g="${gi}" style="width:auto"></td><td class="c">${typeTxt(o.区分)}</td>
+        <td>${esc(o.相手先)}</td><td>${esc(o.摘要)}<div class="muted">${esc(o.登録者)} ${esc(o.登録日時.slice(11,16))}</div></td>
+        <td><input class="s" id="ja${i}" value="${o.金額}" style="width:86px;text-align:right" onchange="chk(${i})"></td><td class="c">${imgLink(o.画像ID)}</td>
+        <td><select class="acct" id="jc${i}" onchange="chk(${i})">${opt(o.区分,o.勘定科目)}</select></td>
+        <td><input class="s" id="js${i}" value="${esc(o.補助科目)}" onchange="chk(${i})"></td>
+        <td><input class="s" id="jm${i}" value="${esc(o.本社メモ)}" onchange="chk(${i})"></td>
+        <td class="c">${kindBadge(o.状態)}</td><td><button class="btn sm danger" onclick="returnEntry(${i})">差戻し</button></td></tr>`; });
+      h+='</tbody></table></div>';
+    }
+    // 有高 ⇔ 元帳残高
+    if(c){
+      const bk=c.照合時帳簿!==''&&c.照合時帳簿!=null?Number(c.照合時帳簿):null, df=bk==null?null:c.合計-bk;
+      const older=G.counts.slice(1);
+      h+=`<div class="grpc">
+        <div class="blk">店舗の有高（${esc(c.登録日時.slice(11,16))}・${esc(c.種別)}）<br><b style="font-size:18px">${yen(c.合計)}</b> ${imgLink(c.画像ID)}${older.length?`<div class="muted">同日の古い有高 ${older.map(x=>`${esc(x.登録日時.slice(11,16))} ${yen(x.合計)} ${imgLink(x.画像ID)}`).join('、')}</div>`:''}</div>
+        <div class="blk">奉行の元帳残高<br><input class="s lb" data-g="${gi}" id="lb${gi}" inputmode="numeric" value="${bk==null?'':bk.toLocaleString()}" placeholder="例 27,500" style="width:130px;text-align:right;font-size:16px" oninput="lbDiff(${gi},${c.合計})"></div>
+        <div class="blk">差異<br><span id="ld${gi}" style="font-size:16px">${df==null?'-':df===0?'<span class="ok">一致</span>':`<span class="ng">${yen(df)}</span>`}</span></div>
+        <div class="blk">照合<br>${c.照合?kindBadge(c.照合)+' <span class="muted">'+esc(c.照合者)+'</span>':kindBadge('照合待ち')}</div>
+        <div class="blk" style="flex:1;text-align:right"><button class="btn ok" onclick="processGroup(${gi})">${G.idx.length?'✔ 処理済にして有高を返信':'✔ 有高の照合を返信'}</button><br><span class="link" style="font-size:12px" onclick="pastCounts('${esc(G.store)}')">この事業所の過去の有高</span></div>
+      </div>`;
+    } else {
+      h+=`<div class="grpc"><span class="ng">⚠ この日の有高表がまだ投稿されていません</span><div style="flex:1;text-align:right">${G.idx.length?`<button class="btn" onclick="processGroup(${gi})">✔ 処理済にする</button>`:''}</div></div>`;
+    }
+    h+='</div>';
   });
-  $('journalBox').innerHTML=h+'</tbody></table></div>'; $('journalSave').classList.toggle('hide',!jRows.length);
-  loadLatestCounts();
+  $('journalBox').innerHTML=h; $('journalSave').classList.toggle('hide',!jGroups.length);
 }
-let latestRows={};
-async function loadLatestCounts(){
-  const stores=$('jStore').value?[$('jStore').value]:[...new Set(jRows.map(o=>o.店舗))];
-  const box=$('latestBox'); if(!stores.length){ box.innerHTML=''; return; }
-  const all=await hq('hqCounts',{store:$('jStore').value},true);
-  latestRows={}; all.forEach(c=>{ if(!latestRows[c.店舗]) latestRows[c.店舗]=c; });
-  box.innerHTML=`<h3>各事業所の最新の現金有高 ⇔ 勘定奉行の元帳残高</h3><p class="muted">勘定奉行に入力後の<b>元帳残高</b>を入れてください。「本社処理済にする」を押すと有高と照合して記録し、店舗にも表示されます（その事業所の行だけ記録したいときは「照合を記録」）。</p><div class="tw"><table><thead><tr><th>事業所</th><th>有高の投稿日時</th><th>有高</th><th>有高表</th><th>奉行の元帳残高</th><th>差異</th><th>照合</th><th></th></tr></thead><tbody>`+
-   stores.map((s,i)=>{const c=latestRows[s]; if(!c) return `<tr><td>${esc(s)}</td><td colspan="7" class="muted">有高の投稿なし</td></tr>`;
-    const bk=c.照合時帳簿!==''&&c.照合時帳簿!=null?Number(c.照合時帳簿):null; const df=bk==null?null:c.合計-bk;
-    return `<tr><td>${esc(s)}</td><td class="d">${esc(c.日付.slice(5))} ${esc(c.登録日時.slice(11,16))}<div class="muted">${esc(c.種別)}</div></td><td class="n"><b>${yen(c.合計)}</b></td><td class="c">${imgLink(c.画像ID)}</td>
-     <td><input class="s lb" data-s="${esc(s)}" id="lb${i}" inputmode="numeric" value="${bk==null?'':bk.toLocaleString()}" placeholder="例 27,500" style="width:110px;text-align:right" oninput="lbDiff(${i},${c.合計})"></td>
-     <td class="n" id="ld${i}">${df==null?'-':df===0?'<span class="ok">一致</span>':`<span class="ng">${yen(df)}</span>`}</td>
-     <td>${c.照合?kindBadge(c.照合)+'<div class="muted">'+esc(c.照合者)+'</div>':kindBadge('照合待ち')}</td>
-     <td><button class="btn sm ok" onclick="saveLedgerBal('${esc(s)}',${i})">照合を記録</button> <span class="link" onclick="pastCounts('${esc(s)}')">過去分</span></td></tr>`}).join('')+'</tbody></table></div>';
-}
-function lbDiff(i,total){ const v=$('lb'+i).value.trim(); const el=$('ld'+i); if(v===''){el.textContent='-';return;} const d=total-num(v); el.innerHTML=d===0?'<span class="ok">一致</span>':`<span class="ng">${yen(d)}</span>`; }
-async function saveLedgerBal(store,i,quiet){
-  const c=latestRows[store]; const v=$('lb'+i).value.trim(); if(!c||v==='') { if(!quiet) toast('元帳残高を入力してください'); return false; }
+function lbDiff(gi,total){ const v=$('lb'+gi).value.trim(); const el=$('ld'+gi); if(v===''){el.textContent='-';return;} const d=total-num(v); el.innerHTML=d===0?'<span class="ok">一致</span>':`<span class="ng">${yen(d)}</span>`; }
+async function saveLedgerBal(gi,quiet){
+  const c=jGroups[gi]&&jGroups[gi].latest; const el=$('lb'+gi); if(!c||!el) return false;
+  const v=el.value.trim(); if(v===''){ if(!quiet) toast('元帳残高を入力してください'); return false; }
   const book=num(v), d=c.合計-book;
-  if(String(book)===String(c.照合時帳簿) && c.照合) return false; // 変更なし
-  await hq('hqCheckCount',{id:c.id,result:d===0?'一致':'差異',book,hqMemo:d===0?'':`元帳残高 ${yen(book)}／有高 ${yen(c.合計)}／差異 ${yen(d)}　ご確認ください`},quiet);
-  if(!quiet){ toast(store+'：'+(d===0?'一致':'差異あり')+'で記録しました'); loadLatestCounts(); }
+  if(c.照合 && String(book)===String(c.照合時帳簿)) return false;
+  await hq('hqCheckCount',{id:c.id,result:d===0?'一致':'差異',book,hqMemo:d===0?'':`元帳残高 ${yen(book)}／有高 ${yen(c.合計)}／差異 ${yen(d)}　ご確認ください`},true);
   return true;
 }
-function pastCounts(s){ $('cStore').value=s; $('cMonth').value=''; $('cAll').checked=true; $('cOpen').checked=false; openTab('htabs','h-','counts',onHqTab); }
+const itemOf=i=>({id:jRows[i].id,account:$('jc'+i).value,sub:$('js'+i).value.trim(),hqMemo:$('jm'+i).value.trim(),amount:num($('ja'+i).value)});
+async function processGroup(gi){
+  const G=jGroups[gi];
+  let idx=[...document.querySelectorAll(`.jk[data-g="${gi}"]:checked`)].map(c=>+c.dataset.i);
+  const open=G.idx.filter(i=>jRows[i].状態==='未処理'||jRows[i].状態==='差戻し');
+  if(!idx.length && open.length){ if(!confirm(`チェックがありません。この事業所・日の未処理 ${open.length}件をすべて処理済にしますか？`)) return; idx=open; }
+  if(G.latest && $('lb'+gi).value.trim()==='' && !confirm('元帳残高が未入力です。取引の処理だけ行いますか？')) return;
+  busy(true);
+  try{
+    let n=0; if(idx.length){ const r=await hq('hqJournal',{items:idx.map(itemOf)},true); n=r.updated; }
+    const sent=G.latest?await saveLedgerBal(gi,true):false;
+    toast(`${G.store} ${G.date.slice(5)}：${n}件を処理済${sent?'・有高の照合を返信':''}しました`);
+  }finally{ busy(false); }
+  loadJournal();
+}
+function pastCounts(s){
+  hq('hqCounts',{store:s}).then(all=>{
+    $('modalBody').innerHTML=`<h3 style="margin:0 0 6px">${esc(s)}　過去の有高</h3><div class="tw"><table><tr><th>日付</th><th>種別</th><th>有高</th><th>奉行の元帳残高</th><th>照合</th><th>有高表</th></tr>`+
+      all.map(c=>`<tr><td class="d">${esc(c.日付)} ${esc(c.登録日時.slice(11,16))}</td><td>${esc(c.種別)}</td><td class="n">${yen(c.合計)}</td><td class="n">${c.照合時帳簿!==''&&c.照合時帳簿!=null?yen(c.照合時帳簿):'-'}</td><td>${c.照合?kindBadge(c.照合):kindBadge('照合待ち')} ${esc(c.本社メモ)}</td><td class="c">${imgLink(c.画像ID)}</td></tr>`).join('')+'</table></div>';
+    $('modal').style.display='flex';
+  });
+}
 function chk(i){ document.querySelector(`.jk[data-i="${i}"]`).checked=true; }
 async function saveJournal(){
-  const items=[...document.querySelectorAll('.jk:checked')].map(c=>{const i=c.dataset.i;return{id:jRows[i].id,account:$('jc'+i).value,sub:$('js'+i).value.trim(),hqMemo:$('jm'+i).value.trim(),amount:num($('ja'+i).value)}});
-  if(!items.length) return toast('行にチェックしてください');
-  const r=await hq('hqJournal',{items});
-  const stores=[...new Set([...document.querySelectorAll('.jk:checked')].map(c=>jRows[c.dataset.i].店舗))];
-  let n=0; for(const el of document.querySelectorAll('.lb')){ if(stores.includes(el.dataset.s) && el.value.trim()!=='' && await saveLedgerBal(el.dataset.s,el.id.slice(2),true)) n++; }
-  toast(r.updated+'件を本社処理済にしました'+(n?`（元帳残高 ${n}事業所を照合記録）`:'')); loadJournal();
+  const idx=[...document.querySelectorAll('.jk:checked')].map(c=>+c.dataset.i);
+  const gis=jGroups.map((G,gi)=>gi).filter(gi=>$('lb'+gi)&&$('lb'+gi).value.trim()!=='');
+  if(!idx.length && !gis.length) return toast('取引にチェックするか、元帳残高を入力してください');
+  busy(true);
+  try{
+    let n=0; if(idx.length){ const r=await hq('hqJournal',{items:idx.map(itemOf)},true); n=r.updated; }
+    let m=0; for(const gi of gis){ if(await saveLedgerBal(gi,true)) m++; }
+    toast(`${n}件を本社処理済にしました`+(m?`（有高の照合 ${m}件を返信）`:''));
+  }finally{ busy(false); }
+  loadJournal();
 }
 async function returnEntry(i){
   const memo=prompt('差戻し理由（店舗に表示されます）',$('jm'+i).value||'証憑の写真が読めません。撮り直してください'); if(memo==null) return;
