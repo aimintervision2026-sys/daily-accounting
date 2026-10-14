@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>店舗現金 リモート経理</title>
+<style>
+:root{--navy:#1b3a5c;--blue:#2d5680;--teal:#0f6b68;--amber:#a8600b;--red:#a52834;--green:#2e7d32;--line:#d4dae2;--light:#eef3f8;--gray:#5b6675}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Meiryo","メイリオ","Yu Gothic UI","Hiragino Kaku Gothic ProN",sans-serif;background:#f6f8fa;color:#1f2933;font-size:15px}
+header{background:var(--navy);color:#fff;padding:10px 16px}
+header h1{font-size:18px;margin:0}
+.share{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px}
+.share input{flex:1;min-width:0;padding:4px 6px;border:none;border-radius:4px;font-size:12px}
+.share button{background:#fff;color:var(--navy);border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer}
+main{max-width:1200px;margin:0 auto;padding:12px 16px 60px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
+.tabs button{flex:1;min-width:84px;padding:10px 6px;border:1px solid var(--line);background:#fff;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:var(--navy)}
+.tabs button.on{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:bold}
+.tabs.mode button.on{background:var(--navy);border-color:var(--navy)}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 10px;color:var(--navy);border-left:4px solid var(--blue);padding-left:8px}
+.card h3{font-size:14px;margin:16px 0 6px;color:var(--navy)}
+label.f{display:block;font-size:13px;color:var(--gray);margin:10px 0 3px}
+input,select,textarea{font-family:inherit;font-size:15px;padding:8px;border:1px solid #c3cde0;border-radius:6px;width:100%;background:#fff}
+textarea{min-height:64px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1;min-width:140px}
+.kinds{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.kinds button{padding:10px 4px;border:1px solid #c3cde0;background:#fff;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer;color:#333}
+.kinds button.on{font-weight:bold;color:#fff}
+.kinds button.k-in.on{background:var(--green);border-color:var(--green)}
+.kinds button.k-out.on{background:var(--red);border-color:var(--red)}
+.kinds button.k-cnt.on{background:var(--teal);border-color:var(--teal)}
+.kinds button.k-rep.on{background:var(--amber);border-color:var(--amber)}
+@media(max-width:520px){.kinds{grid-template-columns:repeat(2,1fr)}}
+.box{border:1px dashed #b8c4d6;border-radius:8px;padding:10px 12px;margin-top:12px;background:#fbfcfe}
+.box.cnt{border-color:var(--teal);background:#f2f9f8}
+.radio{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.radio label{display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer}
+.radio input{width:auto;margin-top:3px}
+.hint{font-size:12px;color:var(--gray);margin:4px 0 0}
+.btn{display:inline-block;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:15px;cursor:pointer;font-family:inherit}
+.btn.big{width:100%;padding:13px;font-size:16px;margin-top:14px}
+.btn.sub{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+.btn.ok{background:var(--teal);color:#fff}
+.btn.warn{background:var(--amber)}
+.btn.danger{background:#fff;color:var(--red);border:1px solid var(--red)}
+.btn.sm{padding:4px 9px;font-size:12px;border-radius:5px;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:default}
+.pick{display:flex;gap:8px;flex-wrap:wrap}
+.pick .btn{flex:1;min-width:140px;text-align:center;padding:12px 10px}
+.pick input{display:none}
+.auto{background:#fff6cc!important;border-color:#e0b100!important}
+#ocrMsg.run{color:var(--blue)}
+#ocrMsg.ok{color:var(--teal);font-weight:bold}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.thumbs div{position:relative}
+.thumbs img,.thumbs .pdf{width:68px;height:68px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.thumbs .pdf{display:flex;align-items:center;justify-content:center;font-size:12px}
+.thumbs .x{position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:12px;cursor:pointer}
+.tw{overflow-x:auto}
+.tw table{min-width:640px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border:1px solid var(--line);padding:5px 6px;vertical-align:middle}
+th{background:var(--light);color:var(--navy);white-space:nowrap}
+td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.c{text-align:center}
+td.d{white-space:nowrap}
+tr.cnt td{background:#f2f9f8}
+tr.cnt.ng td{background:#fff0f0}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:11px;white-space:nowrap}
+.b-未処理,.b-照合待ち,.b-承認待ち,.b-未対応,.b-開示待ち,.b-未{background:#fff3cd;color:#7a5600}
+.b-入力済,.b-承認済,.b-確認待ち{background:#dbe8ff;color:#1d4ea8}
+.b-確認済,.b-一致,.b-対応済,.b-済{background:#d9f2dd;color:#1b6b28}
+.b-差戻し,.b-差異{background:#ffd9d9;color:#a11}
+.ok{color:var(--green);font-weight:bold}.ng{color:var(--red);font-weight:bold}
+.in{color:var(--green)}.out{color:var(--red)}
+.muted{color:var(--gray);font-size:12px}
+.notice{border-left:5px solid var(--amber);background:#fdf8ef;padding:10px 12px;margin-bottom:10px;font-size:14px;border-radius:4px}
+.notice.red{border-left-color:var(--red);background:#fdf2f3}
+.notice.info{border-left-color:var(--teal);background:#eef7f6}
+.steps{display:grid;gap:8px}
+.step{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.step .t{flex:1;min-width:180px;font-size:14px}
+.step input{width:90px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;display:none;z-index:99;max-width:90%;text-align:center}
+#loading{position:fixed;inset:0;background:rgba(255,255,255,.6);display:none;align-items:center;justify-content:center;z-index:98;font-size:16px;color:var(--navy)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:97;padding:12px}
+.modal .box2{background:#fff;border-radius:10px;max-width:1100px;width:100%;max-height:92vh;overflow:auto;padding:14px}
+.modal img{max-width:100%;display:block;margin:6px auto}
+.hide{display:none!important}
+.link{color:var(--blue);cursor:pointer;text-decoration:underline}
+select.acct{min-width:120px;padding:4px;font-size:13px}
+td input.s{padding:4px;font-size:13px;min-width:80px}
+.formula{font-size:12px;color:var(--gray);margin:6px 0}
+@media print{header,.tabs,.noprint{display:none!important}body{background:#fff}.card{border:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>店舗現金 リモート経理</h1>
+  <div class="share"><span>共有URL</span><input id="shareUrl" readonly><button onclick="copyShare()">コピー</button></div>
+</header>
+<main>
+  <div id="setup" class="card hide">
+    <h2>初期設定</h2>
+    <p class="muted">受け皿GASのウェブアプリURL（/exec）を入力してください。</p>
+    <input id="gasInput" placeholder="https://script.google.com/macros/s/.../exec">
+    <button class="btn big" onclick="saveGas()">保存して開始</button>
+  </div>
+
+  <div id="app" class="hide">
+    <div class="tabs mode">
+      <button id="m-store" class="on" onclick="setMode('store')">🏪 店舗</button>
+      <button id="m-hq" onclick="setMode('hq')">🏢 本社</button>
+    </div>
+
+    <!-- ================= 店舗 ================= -->
+    <section id="storeMode">
+      <div class="card">
+        <div class="row">
+          <div><label class="f">事業所</label><select id="store" onchange="onStoreChange()"></select></div>
+          <div><label class="f">店舗経理担当者（氏名）</label><input id="staff" placeholder="例: 浅川" onchange="savePrefs()"></div>
+        </div>
+      </div>
+      <div id="storeAlerts"></div>
+      <div class="tabs" id="stabs">
+        <button data-t="post" class="on">投稿</button>
+        <button data-t="status">今月の状況</button>
+        <button data-t="ledger">元帳確認</button>
+      </div>
+
+      <!-- 投稿 -->
+      <div id="s-post" class="card">
+        <h2 id="postTitle">投稿</h2>
+        <div id="editInfo" class="notice red hide"></div>
+        <label class="f">区分</label>
+        <div class="kinds" id="kinds">
+          <button data-k="支払" class="k-out">支払</button>
+          <button data-k="収受" class="k-in">収受</button>
+          <button data-k="返納" class="k-out">返納</button>
+          <button data-k="補充受領" class="k-in">補充受領</button>
+          <button data-k="有高" class="k-cnt">有高報告</button>
+          <button data-k="補充申請" class="k-rep">補充申請</button>
+          <button data-k="差異報告" class="k-rep">差異報告</button>
+        </div>
+        <div id="kindHint" class="hint"></div>
+
+        <div id="postBody" class="hide">
+          <div class="row">
+            <div><label class="f">日付</label><input type="date" id="pDate"></div>
+            <div class="f-money"><label class="f">金額（円）</label><input id="pAmount" inputmode="numeric" placeholder="1,980"></div>
+          </div>
+
+          <!-- 取引 -->
+          <div class="f-money">
+            <div class="f-partner"><label class="f" id="partnerLabel">相手先</label><input id="pPartner" placeholder="例: コメリ"></div>
+            <label class="f" id="memoLabel">内容・用途</label><input id="pMemo" placeholder="例: 利用者行事用 菓子代">
+            <label class="f" id="evLabel">証憑の写真（領収書・レシート）</label>
+            <div class="pick"><label class="btn ok">📷 カメラで撮影<input type="file" id="fEvCam" accept="image/*" capture="environment"></label><label class="btn sub">🖼 写真・ファイルから選ぶ<input type="file" id="fEv" accept="image/*,application/pdf" multiple></label></div>
+            <div class="thumbs" id="tEv"></div>
+            <div id="ocrMsg" class="hint"></div>
+            <p class="hint" id="evHint"></p>
+          </div>
+
+          <!-- 有高 -->
+          <div class="box cnt f-cnt">
+            <b>現金有高表</b>
+            <div class="radio f-money" id="cntChoice">
+              <label><input type="radio" name="cntMode" value="now" checked> 本日これが最後の取引 → いまの有高表を添付する</label>
+              <label><input type="radio" name="cntMode" value="later"> このあとも本日取引がある（有高表は最後の取引で添付）</label>
+            </div>
+            <div id="cntFields">
+              <div class="row f-cntonly">
+                <div><label class="f">報告の種類</label>
+                  <select id="cKind" onchange="paintKind()"><option>通常</option><option>月末実査</option><option>第三者実査</option></select></div>
+                <div class="f-third"><label class="f">実施者（第三者）</label><input id="cInspector" placeholder="週次MTG担当者名"></div>
+              </div>
+              <label class="f">現在有高（円）※現金を数えて有高表に記入した合計</label>
+              <input id="cTotal" inputmode="numeric" placeholder="27,500">
+              <label class="f">現金有高表の写真</label>
+              <div class="pick"><label class="btn ok">📷 カメラで撮影<input type="file" id="fCntCam" accept="image/*" capture="environment"></label><label class="btn sub">🖼 写真から選ぶ<input type="file" id="fCnt" accept="image/*" multiple></label></div>
+              <div class="thumbs" id="tCnt"></div>
+              <p class="hint" id="cntHint">現金を数えてから撮影してください（原則3：実査先行）。</p>
+            </div>
+          </div>
+
+          <!-- 補充申請 -->
+          <div class="f-refill">
+            <div class="row">
+              <div><label class="f">現在残高（円）</label><input id="rNow" inputmode="numeric" oninput="calcRefill()"></div>
+              <div><label class="f">申請額（円）</label><input id="rAsk" inputmode="numeric"></div>
+            </div>
+            <label class="f">メモ（大口支出の予定など）</label><input id="rText">
+            <p class="hint">投稿後、店長が「今月の状況」から承認します。承認のない申請は本社で処理されません。</p>
+          </div>
+
+          <!-- 差異報告 -->
+          <div class="f-diff">
+            <div class="row">
+              <div><label class="f">報告の種類</label><select id="dKind"><option>差異発生</option><option>差異調査結果</option></select></div>
+              <div><label class="f">差異額（円・不足は−）</label><input id="dAmt" inputmode="numeric" placeholder="-1200"></div>
+            </div>
+            <label class="f">内容（状況／原因・再発防止策）</label><textarea id="dText"></textarea>
+            <p class="hint">差異は金額の多寡にかかわらず当日中に報告してください（原則4）。</p>
+          </div>
+
+          <button class="btn big" id="pSubmit" onclick="submitPost()">投稿する</button>
+          <button class="btn big sub hide" id="pCancel" onclick="resetPost()">修正をやめる</button>
+        </div>
+      </div>
+
+      <!-- 今月の状況 -->
+      <div id="s-status" class="card hide">
+        <h2>今月の状況</h2>
+        <div class="row noprint"><div><label class="f">対象月</label><input type="month" id="sMonth" onchange="loadStatus()"></div><div></div></div>
+        <div id="statusBox"></div>
+      </div>
+
+      <!-- 元帳確認 -->
+      <div id="s-ledger" class="card hide">
+        <h2>現金元帳の確認</h2>
+        <div class="row noprint"><div><label class="f">対象月</label><input type="month" id="lMonth" onchange="loadStoreLedger()"></div>
+          <div style="align-self:flex-end"><button class="btn sub" onclick="window.print()">印刷</button></div></div>
+        <div id="sLedgerBox" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <!-- ================= 本社 ================= -->
+    <section id="hqMode" class="hide">
+      <div id="hqLogin" class="card">
+        <h2>本社ログイン</h2>
+        <div class="row">
+          <div><label class="f">担当者名</label><input id="hqName"></div>
+          <div><label class="f">パスワード</label><input type="password" id="hqPass" onkeydown="if(event.key==='Enter')hqLogin()"></div>
+        </div>
+        <button class="btn big" onclick="hqLogin()">ログイン</button>
+      </div>
+      <div id="hqBody" class="hide">
+        <div class="tabs" id="htabs">
+          <button data-t="journal" class="on">受付・入力</button>
+          <button data-t="counts">有高照合</button>
+          <button data-t="month">月次・開示</button>
+          <button data-t="reports">申請・報告</button>
+          <button data-t="setting">繰越設定</button>
+        </div>
+
+        <div id="h-journal" class="card">
+          <h2>受付・入力（勘定奉行への入力）</h2>
+          <div class="row noprint">
+            <div><label class="f">事業所</label><select id="jStore" class="hqStoreSel"></select></div>
+            <div><label class="f">対象月（空欄=全期間）</label><input type="month" id="jMonth"></div>
+            <div><label class="f">状態</label><select id="jStatus"><option>未処理</option><option>差戻し</option><option value="入力済">本社処理済</option><option value="確認済">店舗確認済</option><option>すべて</option></select></div>
+            <div style="align-self:flex-end"><button class="btn" onclick="loadJournal()">表示</button></div>
+          </div>
+          <div id="latestBox" style="margin-top:10px"></div>
+          <div id="journalBox" style="margin-top:10px"></div>
+          <button class="btn big hide" id="journalSave" onclick="saveJournal()">チェックした行を「本社処理済」にする（店舗へ確認依頼）</button>
+        </div>
+
+        <div id="h-counts" class="card hide">
+          <h2>有高照合（取引のつど／8.3）</h2>
+          <div class="row noprint">
+            <div><label class="f">事業所</label><select id="cStore" class="hqStoreSel"></select></div>
+            <div><label class="f">対象月</label><input type="month" id="cMonth"></div>
+            <div style="align-self:flex-end"><label style="font-size:14px"><input type="checkbox" id="cOpen" checked style="width:auto"> 未照合のみ</label><br><label style="font-size:14px"><input type="checkbox" id="cAll" style="width:auto"> 過去分も表示（同じ日の古い有高）</label></div>
+            <div style="align-self:flex-end"><button class="btn" onclick="loadCounts()">表示</button></div>
+          </div>
+          <p class="formula">帳簿残高＝その有高表が投稿された時点までに登録された取引から計算した残高</p>
+          <div id="countsBox"></div>
+        </div>
+
+        <div id="h-month" class="card hide">
+          <h2>月次・開示（9.2 検証／9.4 開示）</h2>
+          <div class="row noprint"><div><label class="f">対象月</label><input type="month" id="mMonth"></div>
+            <div style="align-self:flex-end"><button class="btn" onclick="loadMonth()">表示</button> <button class="btn sub" onclick="exportCsv()">仕訳CSV出力</button></div></div>
+          <p class="formula">前月末残高 ＋ 補充 ＋ 収受 － 支払 － 返納 ＝ 帳簿月末残高 ⇔ 月末実査の有高</p>
+          <div id="monthBox"></div>
+        </div>
+
+        <div id="h-reports" class="card hide">
+          <h2>申請・報告</h2>
+          <div class="row noprint">
+            <div><label class="f">事業所</label><select id="rStore" class="hqStoreSel"></select></div>
+            <div style="align-self:flex-end"><label style="font-size:14px"><input type="checkbox" id="rOpen" checked style="width:auto"> 未対応のみ</label></div>
+            <div style="align-self:flex-end"><button class="btn" onclick="loadReports()">表示</button></div>
+          </div>
+          <div id="reportsBox" style="margin-top:10px"></div>
+        </div>
+
+        <div id="h-setting" class="card hide">
+          <h2>繰越設定</h2>
+          <p class="muted">運用開始日（繰越日）と、その日の開始時点の現金残高（移行時の実査額）を設定します。繰越日より前の取引は計算に含めません。</p>
+          <div id="carryBox"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="toast"></div>
+<div id="loading">処理中…</div>
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="box2"><div style="text-align:right"><button class="btn sm sub" onclick="closeModal()">閉じる</button></div><div id="modalBody"></div></div></div>
+
+<script>
+/* ===== 設定 ===== */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzdFW0rK85JivdQpusCE0I6wOiX7ro8z5xtckOpwYE4qgDEpTIBaYu04NGaiIeZbjU5mg/exec';
+const SHARE_URL = ''; // 共有用URL（TinyURL等）。空欄なら現在のURL
+
+/* ===== 共通 ===== */
+const $ = id => document.getElementById(id);
+const yen = n => (n==null||n==='')?'-':(Number(n)<0?'▲':'')+Math.abs(Number(n)).toLocaleString()+'円';
+const num = s => Number(String(s).replace(/[^\d.-]/g,''))||0;
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const ls = { get(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}} };
+const IN = {'収受':1,'補充受領':1};
+let gasUrl = GAS_URL || ls.get('keiri_gas','');
+let M = {stores:[],accounts:[],limitMax:30000,limitRefill:10000};
+let hqPass = '';
+
+function toast(m,ms){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',ms||2600)}
+function busy(on){$('loading').style.display=on?'flex':'none'}
+function copyShare(){const i=$('shareUrl');i.select();try{navigator.clipboard.writeText(i.value)}catch(e){document.execCommand('copy')}toast('コピーしました')}
+async function api(action, params, quiet){
+  if(!quiet) busy(true);
+  try{
+    const res = await fetch(gasUrl,{method:'POST',body:JSON.stringify(Object.assign({action},params||{}))});
+    const j = await res.json();
+    if(!j.ok) throw new Error(j.error||'エラー');
+    return j.data;
+  }catch(e){ toast('エラー: '+e.message,4500); throw e; }
+  finally{ if(!quiet) busy(false); }
+}
+const staff = () => $('staff').value.trim();
+const store = () => $('store').value;
+const LABEL={'入力済':'本社処理済','確認済':'店舗確認済'};
+const kindBadge = s => `<span class="badge b-${esc(s)}">${esc(LABEL[s]||s)}</span>`;
+const typeTxt = t => `<span class="${IN[t]?'in':'out'}">${esc(t)}</span>`;
+
+/* ===== 起動 ===== */
+window.addEventListener('DOMContentLoaded', ()=>{
+  $('shareUrl').value = SHARE_URL || location.href.split('?')[0].split('#')[0];
+  if(!gasUrl){ $('setup').classList.remove('hide'); return; }
+  start();
+});
+function saveGas(){ gasUrl=$('gasInput').value.trim(); if(!gasUrl) return; ls.set('keiri_gas',gasUrl); $('setup').classList.add('hide'); start(); }
+
+async function start(){
+  $('app').classList.remove('hide');
+  try{ M = await api('init'); }catch(e){ $('setup').classList.remove('hide'); return; }
+  const opts = M.stores.map(s=>`<option>${esc(s)}</option>`).join('');
+  $('store').innerHTML = opts;
+  document.querySelectorAll('.hqStoreSel').forEach(s=>s.innerHTML='<option value="">すべて</option>'+opts);
+  if(M.stores.includes(ls.get('keiri_store',''))) $('store').value = ls.get('keiri_store','');
+  $('staff').value = ls.get('keiri_staff','');
+  $('hqName').value = ls.get('keiri_hqname','');
+  const m = today().slice(0,7);
+  ['sMonth','lMonth','jMonth','cMonth','mMonth'].forEach(id=>$(id).value=m); $('pDate').value=today();
+  setupTabs('stabs','s-',onStoreTab); setupTabs('htabs','h-',onHqTab);
+  document.querySelectorAll('#kinds button').forEach(b=>b.onclick=()=>selectKind(b.dataset.k));
+  document.querySelectorAll('input[name=cntMode]').forEach(r=>r.onchange=paintKind);
+  $('pDate').addEventListener('input',()=>{dateTouched=true;}); ['pDate','pAmount','pPartner'].forEach(id=>$(id).addEventListener('input',()=>$(id).classList.remove('auto')));
+  $('fEv').onchange=e=>addFiles(e,'ev'); $('fCnt').onchange=e=>addFiles(e,'cnt'); $('fEvCam').onchange=e=>addFiles(e,'ev'); $('fCntCam').onchange=e=>addFiles(e,'cnt');
+  ['pAmount','cTotal','rNow','rAsk'].forEach(id=>$(id).addEventListener('blur',()=>{const v=$(id).value.trim();if(v!=='')$(id).value=num(v).toLocaleString()}));
+  try{ const p=sessionStorage.getItem('keiri_hq'); if(p) hqPass=p; }catch(e){}
+  if(location.hash==='#hq') setMode('hq');
+  refreshAlerts();
+}
+function savePrefs(){ ls.set('keiri_store',store()); ls.set('keiri_staff',staff()); }
+function onStoreChange(){ savePrefs(); refreshAlerts(); onStoreTab(document.querySelector('#stabs .on').dataset.t); }
+function setupTabs(boxId,prefix,cb){
+  const box=$(boxId);
+  box.querySelectorAll('button').forEach(b=>b.onclick=()=>openTab(boxId,prefix,b.dataset.t,cb));
+}
+function openTab(boxId,prefix,t,cb){
+  $(boxId).querySelectorAll('button').forEach(x=>{x.classList.toggle('on',x.dataset.t===t);$(prefix+x.dataset.t).classList.toggle('hide',x.dataset.t!==t)});
+  cb&&cb(t);
+}
+function setMode(m){
+  $('m-store').classList.toggle('on',m==='store'); $('m-hq').classList.toggle('on',m==='hq');
+  $('storeMode').classList.toggle('hide',m!=='store'); $('hqMode').classList.toggle('hide',m!=='hq');
+  if(m==='hq' && hqPass && $('hqBody').classList.contains('hide')) hqLogin(true);
+}
+
+/* ===== 画像 ===== */
+const pend = {ev:[], cnt:[]};
+let keepImages = [];
+async function addFiles(ev,k){
+  const files=[...ev.target.files]; ev.target.value='';
+  const before=pend[k].length;
+  for(const f of files){ try{ pend[k].push(await compress(f)); }catch(e){ toast(e.message,4000); } }
+  drawThumbs(k);
+  const img=pend[k][before];
+  if(k==='ev' && img && img.startsWith('data:image') && !editing && (kind==='支払'||kind==='収受')) runOcr(img);
+}
+function compress(file){
+  return new Promise((resolve,reject)=>{
+    const rd=new FileReader(); rd.onerror=()=>reject(new Error('読込失敗'));
+    if(file.type==='application/pdf'){
+      if(file.size>8*1024*1024) return reject(new Error('PDFは8MBまでです'));
+      rd.onload=()=>resolve(rd.result); rd.readAsDataURL(file); return;
+    }
+    rd.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const r=Math.min(1,1600/Math.max(img.width,img.height));
+        const c=document.createElement('canvas'); c.width=Math.round(img.width*r); c.height=Math.round(img.height*r);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height); resolve(c.toDataURL('image/jpeg',0.8));
+      };
+      img.onerror=()=>reject(new Error('画像を読み込めません（iPhoneはカメラ設定を「互換性優先」に）'));
+      img.src=rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+function drawThumbs(k){
+  let h='';
+  if(k==='ev') h+=keepImages.map((id,i)=>`<div><span class="pdf link" onclick="showImages('${id}')">既存${i+1}</span><span class="x" onclick="keepImages.splice(${i},1);drawThumbs('ev')">×</span></div>`).join('');
+  h+=pend[k].map((d,i)=>`<div>${d.startsWith('data:application/pdf')?'<div class="pdf">PDF</div>':`<img src="${d}">`}<span class="x" onclick="pend['${k}'].splice(${i},1);drawThumbs('${k}')">×</span></div>`).join('');
+  $(k==='ev'?'tEv':'tCnt').innerHTML=h;
+}
+async function showImages(ids){
+  const list=String(ids).split(',').filter(Boolean); if(!list.length) return;
+  $('modalBody').innerHTML='読込中…'; $('modal').style.display='flex';
+  let h='';
+  for(const id of list){
+    try{ const r=await api('image',{id},true);
+      h+= r.dataUrl.startsWith('data:application/pdf') ? `<p><a download="${esc(r.name)}" href="${r.dataUrl}">📄 ${esc(r.name)}</a></p>` : `<img src="${r.dataUrl}" alt="${esc(r.name)}"><p class="muted" style="text-align:center">${esc(r.name)}</p>`;
+    }catch(e){ h+='<p class="ng">画像を取得できませんでした</p>'; }
+    $('modalBody').innerHTML=h;
+  }
+}
+function closeModal(){ $('modal').style.display='none'; }
+const imgLink = ids => ids ? `<span class="link" onclick="showImages('${esc(ids)}')">📎${ids.split(',').length}</span>` : '<span class="muted">なし</span>';
+
+/* ===== OCR（写真から日付・金額・支払先を読み取り） ===== */
+let dateTouched=false;
+async function runOcr(img){
+  const msg=$('ocrMsg'); msg.className='hint run'; msg.textContent='🔍 写真から日付・金額・相手先を読み取り中…（数秒かかります）';
+  try{
+    const r=await api('ocr',{image:img},true);
+    const g=parseReceipt(r.text||'');
+    const got=[];
+    const put=(id,v,label)=>{ if(v==null||v==='') return; const el=$(id); el.value=v; el.classList.add('auto'); got.push(label); };
+    if(g.date && !dateTouched) put('pDate',g.date,'日付');
+    if(g.amount && !$('pAmount').value.trim()) put('pAmount',g.amount.toLocaleString(),'金額');
+    if(kind==='支払' && g.partner && !$('pPartner').value.trim()) put('pPartner',g.partner,'支払先');
+    if(got.length){ msg.className='hint ok'; msg.textContent=`✔ ${got.join('・')}を読み取りました。黄色の欄が正しいか確認してください（違えば直接修正）。`; }
+    else { msg.className='hint'; msg.textContent='読み取れませんでした。手入力してください。'; }
+  }catch(e){ msg.className='hint'; msg.textContent='自動読み取りは使えませんでした（手入力してください）'; }
+}
+function z2h(t){ return t.replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[，、]/g,',').replace(/[．。]/g,'.').replace(/[／]/g,'/').replace(/[－―‐]/g,'-').replace(/(\d)ー(?=\d)/g,'$1-').replace(/[￥\\]/g,'¥').replace(/[：]/g,':').replace(/\u3000/g,' '); }
+function parseReceipt(raw){
+  const text=z2h(raw); const lines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const res={};
+  // 日付
+  const now=new Date(), lo=new Date(now.getTime()-400*864e5), hi=new Date(now.getTime()+3*864e5);
+  const ok=(y,m,d)=>{ const dt=new Date(y,m-1,d); if(dt.getMonth()!==m-1||dt<lo||dt>hi) return null; return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; };
+  const pats=[
+    [/(20\d{2})\s*[年\/.\-]\s*(\d{1,2})\s*[月\/.\-]\s*(\d{1,2})/g, m=>ok(+m[1],+m[2],+m[3])],
+    [/(?:令和|R)\s*(\d{1,2}|元)\s*[年\/.\-]\s*(\d{1,2})\s*[月\/.\-]\s*(\d{1,2})/gi, m=>ok(2018+(m[1]==='元'?1:+m[1]),+m[2],+m[3])],
+    [/(?:^|[^\d])(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{1,2})(?![\d])/g, m=>{const a=+m[1]; return ok(a>=20?2000+a:2018+a,+m[2],+m[3]);}]
+  ];
+  for(const [re,fn] of pats){ if(res.date) break; for(const m of text.matchAll(re)){ const v=fn(m); if(v){res.date=v;break;} } }
+  // 金額
+  const bad=/(預|釣|つり|ポイント|TEL|電話|No\.|番号|登録|点数|数量|個)/i;
+  const nums=s=>[...s.matchAll(/¥?\s*(\d{1,3}(?:,\d{3})+|\d{1,7})\s*(円|-)?/g)].filter(m=>!/\d[\/:]\d/.test(m[0])).map(m=>({v:+m[1].replace(/,/g,''),mark:/¥/.test(m[0])||!!m[2]})).filter(x=>x.v>0&&x.v<1000000);
+  const pick=(re)=>{ for(let i=0;i<lines.length;i++){ const L=lines[i]; if(!re.test(L)||bad.test(L)) continue;
+      let c=nums(L.replace(re,' ')); if(!c.length&&lines[i+1]) c=nums(lines[i+1]); if(c.length) return Math.max(...c.map(x=>x.v)); } return null; };
+  res.amount = pick(/(合\s*計|お?買\s*上|領収金額|ご?請求|税込\s*計|総\s*額)/) || pick(/(小\s*計|金\s*額)/);
+  if(!res.amount){ const c=lines.filter(L=>!bad.test(L)).flatMap(nums).filter(x=>x.mark); if(c.length) res.amount=Math.max(...c.map(x=>x.v)); }
+  // 相手先（支払先）
+  const self=/(エイム|寿リハ|リハビリ|様|御中|宛|領収|レシート|receipt)/i;
+  const shop=/(株式会社|有限会社|合同会社|\(株\)|（株）|㈱|\(有\)|㈲|銀行|郵便局|信用金庫|店|ストア|マート|薬局|ドラッグ|センター|商店|書店)/;
+  let p=lines.find(L=>shop.test(L)&&!self.test(L)&&!/\d{2,}-\d{2,}/.test(L));
+  if(!p) p=lines.find(L=>!self.test(L)&&/[ぁ-んァ-ン一-龠A-Za-z]{2,}/.test(L)&&!/\d.*\d/.test(L)&&!/(但し|ありがと|合計|小計|金額)/.test(L));
+  if(p) res.partner=p.replace(/\s+/g,' ').slice(0,30);
+  return res;
+}
+
+/* ===== 店舗：投稿 ===== */
+let kind = '', editing = null;
+const HINTS = {
+  '支払':'領収書・レシートの余白に用途を手書きしてから撮影。宛名は「株式会社エイムインタービジョン」。領収書が出ない支払いは支払証明書（店長確認印）を撮影。',
+  '収受':'Rehab Cloudから領収証を出力して交付し、その控えを撮影（当日中）。',
+  '返納':'本社へ現金を返納したとき。',
+  '補充受領':'本社から補充金を受け取ったとき。金額を確認してから投稿。',
+  '有高':'取引のない日の有高報告、月末実査（最終営業日・店長確認印）、第三者実査（押印済み）に使います。',
+  '補充申請':'残高が10,000円を下回ったら申請（原則：30,000円まで戻す額）。立替は禁止です。',
+  '差異報告':'帳簿と有高の差異を知ったら、当日中に報告。調査後は「差異調査結果」で原因と再発防止策を報告。'
+};
+function selectKind(k){
+  if(editing && !['支払','収受','返納','補充受領'].includes(k)) return toast('修正中は区分を取引から変えられません');
+  kind=k;
+  document.querySelectorAll('#kinds button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  $('kindHint').textContent=HINTS[k]||'';
+  $('postBody').classList.remove('hide');
+  if(k==='有高' && !editing) $('cKind').value = isMonthEndToday() ? '月末実査' : $('cKind').value;
+  paintKind();
+}
+function isMonthEndToday(){ const d=new Date(); const n=new Date(d); n.setDate(d.getDate()+1); return n.getDate()===1; }
+function paintKind(){
+  const money=['支払','収受','返納','補充受領'].includes(kind);
+  const show=(sel,on)=>document.querySelectorAll(sel).forEach(e=>e.classList.toggle('hide',!on));
+  show('.f-money',money); show('.f-cnt',money||kind==='有高'); show('.f-cntonly',kind==='有高');
+  show('.f-third',kind==='有高'&&$('cKind').value==='第三者実査');
+  show('.f-refill',kind==='補充申請'); show('.f-diff',kind==='差異報告');
+  show('.f-partner',kind==='支払'||kind==='収受');
+  $('partnerLabel').textContent = kind==='収受'?'利用者・入金元（任意）':'支払先';
+  $('pPartner').placeholder = kind==='収受'?'例: 〇〇様':'例: コメリ';
+  $('memoLabel').textContent = kind==='収受'?'内容（例: 9月分 利用者負担金）':'内容・用途';
+  $('evLabel').textContent = kind==='収受'?'領収証（控え）の写真':kind==='支払'?'証憑の写真（領収書・レシート／支払証明書）':'証憑の写真（任意）';
+  $('evHint').textContent = (kind==='支払'||kind==='収受')?'1件につき1投稿。金額・日付・相手先が読めるように撮影（感熱紙は早めに）。':'';
+  const later = money && document.querySelector('input[name=cntMode]:checked').value==='later';
+  $('cntFields').classList.toggle('hide',later);
+  const ck=$('cKind').value;
+  $('cntHint').textContent = kind==='有高'&&ck==='月末実査' ? '最終営業日の業務終了後に数え、店長の確認印を受けた有高表を撮影。元帳を見る前に行います（原則3）。'
+    : kind==='有高'&&ck==='第三者実査' ? '実施者自身が数え、実施者と店長が押印した有高表を撮影。'
+    : '現金を数えて有高表に記入してから撮影してください。';
+  const labels={'支払':'支払を投稿','収受':'収受を投稿','返納':'返納を投稿','補充受領':'補充受領を投稿','有高':'有高を報告','補充申請':'補充を申請','差異報告':'差異を報告'};
+  $('pSubmit').textContent = editing?'修正して再送':labels[kind]||'投稿する';
+}
+function calcRefill(){ const n=num($('rNow').value); if($('rNow').value.trim()!=='') $('rAsk').value=Math.max(0,M.limitMax-n).toLocaleString(); }
+
+function resetPost(keepKind){
+  editing=null; keepImages=[]; pend.ev=[]; pend.cnt=[]; drawThumbs('ev'); drawThumbs('cnt');
+  ['pAmount','pPartner','pMemo','cTotal','cInspector','rNow','rAsk','rText','dAmt','dText'].forEach(id=>$(id).value='');
+  $('pDate').value=today(); dateTouched=false; document.querySelector('input[name=cntMode][value=now]').checked=true;
+  $('ocrMsg').textContent=''; $('ocrMsg').className='hint'; document.querySelectorAll('.auto').forEach(e=>e.classList.remove('auto'));
+  $('editInfo').classList.add('hide'); $('pCancel').classList.add('hide'); $('postTitle').textContent='投稿';
+  $('cntChoice').classList.remove('hide');
+  if(keepKind && kind) paintKind(); else { kind=''; document.querySelectorAll('#kinds button').forEach(b=>b.classList.remove('on')); $('postBody').classList.add('hide'); $('kindHint').textContent=''; }
+}
+
+async function submitPost(){
+  if(!staff()) return toast('担当者名を入力してください');
+  const date=$('pDate').value; if(!date) return toast('日付を入力してください');
+  const base={store:store(),staff:staff(),date};
+  const cntPayload = () => {
+    const t=$('cTotal').value.trim();
+    if(t==='') { toast('現在有高を入力してください'); return null; }
+    if(!pend.cnt.length){ toast('現金有高表の写真を添付してください'); return null; }
+    return {total:num(t),images:pend.cnt,kind:kind==='有高'?$('cKind').value:'通常',inspector:$('cInspector').value.trim()};
+  };
+  let msg='投稿しました', cnt=null;
+  if(['支払','収受','返納','補充受領'].includes(kind)){
+    const p=Object.assign(base,{type:kind,amount:num($('pAmount').value),partner:$('pPartner').value.trim(),memo:$('pMemo').value.trim(),images:pend.ev});
+    if(!(p.amount>0)) return toast('金額を入力してください');
+    if(!p.memo && !p.partner) return toast('内容を入力してください');
+    if((kind==='支払'||kind==='収受') && !pend.ev.length && !keepImages.length) return toast('証憑の写真を添付してください');
+    if(editing){ p.id=editing; p.keepImages=keepImages; await api('updateEntry',p); msg='修正して再送しました'; }
+    else{
+      if(document.querySelector('input[name=cntMode]:checked').value==='now'){ cnt=cntPayload(); if(!cnt) return; p.count=cnt; }
+      await api('addEntry',p);
+    }
+  } else if(kind==='有高'){
+    cnt=cntPayload(); if(!cnt) return;
+    if(cnt.kind==='第三者実査' && !cnt.inspector) return toast('実施者を入力してください');
+    await api('addCount',Object.assign(base,cnt)); msg='有高を報告しました';
+  } else if(kind==='補充申請'){
+    if($('rNow').value.trim()===''||!(num($('rAsk').value)>0)) return toast('現在残高と申請額を入力してください');
+    await api('addReport',Object.assign(base,{kind:'補充申請',a:num($('rNow').value),b:num($('rAsk').value),text:$('rText').value.trim()}));
+    msg='補充を申請しました。店長の承認を受けてください';
+  } else if(kind==='差異報告'){
+    if(!$('dText').value.trim()) return toast('内容を入力してください');
+    await api('addReport',Object.assign(base,{kind:$('dKind').value,a:$('dAmt').value.trim()===''?'':num($('dAmt').value),text:$('dText').value.trim()}));
+    msg='報告しました';
+  } else return toast('区分を選んでください');
+  toast(msg,3500);
+  const last=cnt?cnt.total:null;
+  resetPost(); refreshAlerts();
+  if(last!=null) limitNotice(last,true);
+}
+function limitNotice(total,pop){
+  let h='';
+  if(total>M.limitMax) h=`<div class="notice red">⚠ 現在有高 ${yen(total)} が上限 ${yen(M.limitMax)} を超えています。<b>本日中に本社へ連絡し、残高調整（返納）</b>を行ってください（原則1）。</div>`;
+  else if(total<M.limitRefill) h=`<div class="notice">現在有高 ${yen(total)} が ${yen(M.limitRefill)} を下回っています。<b>補充を申請</b>してください（原則2：立替禁止）。 <button class="btn sm warn" onclick="goRefill(${total})">補充申請へ</button></div>`;
+  if(pop && h){ $('modalBody').innerHTML=h; $('modal').style.display='flex'; }
+  return h;
+}
+function goRefill(total){ closeModal(); openTab('stabs','s-','post',onStoreTab); selectKind('補充申請'); $('rNow').value=Number(total).toLocaleString(); calcRefill(); window.scrollTo(0,0); }
+
+function editEntry(o){
+  resetPost(); editing=o.id; keepImages=o.画像ID?o.画像ID.split(','):[];
+  openTab('stabs','s-','post',onStoreTab);
+  selectKind(o.区分);
+  $('pDate').value=o.日付; $('pAmount').value=Number(o.金額).toLocaleString(); $('pPartner').value=o.相手先; $('pMemo').value=o.摘要;
+  $('postTitle').textContent='投稿の修正'; $('pCancel').classList.remove('hide'); $('cntChoice').classList.add('hide');
+  document.querySelector('input[name=cntMode][value=later]').checked=true; paintKind();
+  if(o.本社メモ){ $('editInfo').innerHTML='本社からのメモ: <b>'+esc(o.本社メモ)+'</b>'; $('editInfo').classList.remove('hide'); }
+  drawThumbs('ev'); window.scrollTo(0,0);
+}
+async function deleteEntry(id){
+  if(!confirm('この投稿を取り消しますか？')) return;
+  await api('deleteEntry',{id,staff:staff()}); toast('取り消しました'); loadStatus(); refreshAlerts();
+}
+
+/* ===== 店舗：アラート ===== */
+async function refreshAlerts(){
+  const box=$('storeAlerts');
+  try{
+    const r=await api('storeMonth',{store:store(),month:today().slice(0,7)},true);
+    window._sm=r; let h='';
+    if(r.returned.length){ window._ret=r.returned; h+=`<div class="notice red">⚠ 本社から<b>差戻し ${r.returned.length}件</b>：<br>`+r.returned.map((o,i)=>`${esc(o.日付)} ${esc(o.区分)} ${esc(o.相手先||o.摘要)} ${yen(o.金額)}「${esc(o.本社メモ)}」 <button class="btn sm warn" onclick="editEntry(window._ret[${i}])">修正</button>`).join('<br>')+'</div>'; }
+    const past=r.pendingCountDays.filter(d=>d<today()), tod=r.pendingCountDays.includes(today());
+    if(past.length) h+=`<div class="notice red">⚠ 有高表が未投稿の日があります：${past.map(d=>d.slice(5)).join('、')}　「有高報告」から投稿してください（投稿完了とみなされません）。</div>`;
+    if(tod) h+=`<div class="notice">本日の最後の取引のあと、<b>現金有高表</b>を投稿してください。</div>`;
+    const wait=r.reports.filter(x=>x.状態==='承認待ち');
+    if(wait.length) h+=`<div class="notice">補充申請が<b>店長の承認待ち</b>です（${wait.length}件）。<span class="link" onclick="openTab('stabs','s-','status',onStoreTab)">今月の状況</span>で承認してください。</div>`;
+    const toCf=r.entries.filter(o=>o.状態==='入力済').length;
+    if(toCf) h+=`<div class="notice info">✔ 本社処理済の取引が <b>${toCf}件</b> あります。<span class="link" onclick="openTab('stabs','s-','status',onStoreTab)">今月の状況</span>で確認チェックをしてください。</div>`;
+    if(r.unconfirmedMonths.length) h+=`<div class="notice info">📒 ${r.unconfirmedMonths.map(m=>m.replace('-','年')+'月').join('、')}分の元帳が開示されました。<span class="link" onclick="$('lMonth').value='${r.unconfirmedMonths[0]}';openTab('stabs','s-','ledger',onStoreTab)">元帳確認</span>を行ってください。</div>`;
+    if(r.lastCount) h+=limitNotice(r.lastCount.total,false);
+    box.innerHTML=h;
+  }catch(e){ box.innerHTML=''; }
+}
+
+/* ===== 店舗：今月の状況 ===== */
+function onStoreTab(t){ if(t==='status') loadStatus(); if(t==='ledger') loadStoreLedger(); }
+async function loadStatus(){
+  const month=$('sMonth').value;
+  const r=await api('storeMonth',{store:store(),month});
+  window._st=r; const ms=r.monthStatus||{};
+  const sum={支払:[0,0],収受:[0,0],返納:[0,0],補充受領:[0,0]};
+  r.entries.forEach(o=>{sum[o.区分][0]++;sum[o.区分][1]+=o.金額;});
+  let h='';
+  // 月末の手続き
+  const mEnd=r.counts.filter(c=>c.種別==='月末実査').pop();
+  const closeTxt=`${store()}／${month.replace('-','年')}月分／支払 ${sum.支払[0]}件 ${yen(sum.支払[1])}／収受 ${sum.収受[0]}件 ${yen(sum.収受[1])}／返納 ${sum.返納[0]}回 ${yen(sum.返納[1])}／補充 ${sum.補充受領[0]}回 ${yen(sum.補充受領[1])}`;
+  h+=`<h3>月末の手続き</h3><div class="steps">
+   <div class="step"><span class="t">① 月末実査（最終営業日・店長確認印）</span>${mEnd?kindBadge('済')+` <span class="muted">${mEnd.日付.slice(5)} ${yen(mEnd.合計)}</span>`:`${kindBadge('未')} <button class="btn sm" onclick="openTab('stabs','s-','post',onStoreTab);selectKind('有高');$('cKind').value='月末実査';paintKind()">有高報告へ</button>`}</div>
+   <div class="step"><span class="t">② 締め（当月の投稿は以上）<br><span class="muted">${esc(closeTxt)}</span></span>${ms.締め日時?kindBadge('済')+` <span class="muted">${esc(ms.締め者)}</span>`:`<button class="btn sm" onclick="monthAct('close')">締める</button>`}</div>
+   <div class="step"><span class="t">③ 元帳確認（本社の開示後）</span>${ms.元帳確認日時?kindBadge('済'):ms.開示日時?`${kindBadge('確認待ち')} <button class="btn sm" onclick="$('lMonth').value='${month}';openTab('stabs','s-','ledger',onStoreTab)">元帳を見る</button>`:kindBadge('開示待ち')}</div>
+   <div class="step"><span class="t">④ 証憑原本の送付（翌月10日まで）</span>${ms.原本送付日時?kindBadge('済')+` <span class="muted">${esc(ms.原本枚数)}枚${ms.原本照合日時?' / 本社照合済':''}</span>`:`<input id="origN" inputmode="numeric" placeholder="枚数"> <button class="btn sm" onclick="monthAct('original')">送付済にする</button>`}</div>
+  </div>`;
+  // 申請・報告
+  if(r.reports.length){
+    window._rep=r.reports;
+    h+=`<h3>申請・報告</h3><div class="tw"><table><tr><th>日付</th><th>種別</th><th>内容</th><th>状態</th><th>本社対応</th><th></th></tr>`+
+    r.reports.map((x,i)=>`<tr><td class="d">${x.日付.slice(5)}</td><td>${esc(x.種別)}</td><td>${x.種別==='補充申請'?`残高 ${yen(x.金額A)} / 申請 ${yen(x.金額B)}`:(x.金額A!==''?`差異 ${yen(x.金額A)} `:'')}${esc(x.内容)}<div class="muted">${esc(x.登録者)}</div></td>
+      <td class="c">${kindBadge(x.状態)}${x.店長承認者?'<div class="muted">承認:'+esc(x.店長承認者)+'</div>':''}</td><td>${esc(x.本社対応)}</td>
+      <td>${x.状態==='承認待ち'?`<button class="btn sm ok" onclick="approve(${i})">店長承認</button>`:''}</td></tr>`).join('')+`</table></div>`;
+  }
+  // 取引
+  window._ent={};
+  h+=`<h3>取引の投稿（${r.entries.length}件）</h3>`;
+  h+= r.entries.length?`<div class="tw"><table><tr><th>確認</th><th>日付</th><th>区分</th><th>相手先・内容</th><th>金額</th><th>証憑</th><th>状態</th><th>本社メモ</th><th></th></tr>`+
+    r.entries.map(o=>{window._ent[o.id]=o; const ed=o.状態==='未処理'||o.状態==='差戻し';
+      return `<tr><td class="c">${o.状態==='入力済'?`<input type="checkbox" class="sck" value="${o.id}" style="width:22px;height:22px">`:o.状態==='確認済'?'✔':''}</td><td class="d">${o.日付.slice(5)}</td><td class="c">${typeTxt(o.区分)}</td><td>${esc(o.相手先)} ${esc(o.摘要)}<div class="muted">${esc(o.登録者)}</div></td><td class="n">${yen(o.金額)}</td><td class="c">${imgLink(o.画像ID)}</td><td class="c">${kindBadge(o.状態)}</td><td>${esc(o.本社メモ)}</td>
+      <td>${ed?`<button class="btn sm sub" onclick="editEntry(window._ent['${o.id}'])">修正</button> <button class="btn sm danger" onclick="deleteEntry('${o.id}')">取消</button>`:''}</td></tr>`}).join('')+'</table></div>'+(r.entries.some(o=>o.状態==='入力済')?`<button class="btn big ok" onclick="confirmEntries()">チェックした取引を「店舗確認済」にする</button><p class="hint">本社処理済の取引の内容（金額・科目）に相違がなければチェックしてください。相違があれば本社経理担当者へ連絡。</p>`:''):'<p class="muted">この月の取引はありません。（取引がなくても月末実査・締めは必要です）</p>';
+  // 有高
+  h+=`<h3>有高の報告（${r.counts.length}件）</h3>`;
+  h+= r.counts.length?`<div class="tw"><table><tr><th>日付</th><th>種別</th><th>有高</th><th>有高表</th><th>本社照合</th></tr>`+
+    r.counts.map(c=>`<tr><td class="d">${c.日付.slice(5)}</td><td>${esc(c.種別)}${c.実施者?'<div class="muted">実施:'+esc(c.実施者)+'</div>':''}</td><td class="n">${yen(c.合計)}</td><td class="c">${imgLink(c.画像ID)}</td><td>${c.照合?kindBadge(c.照合):kindBadge('照合待ち')} ${esc(c.本社メモ)}</td></tr>`).join('')+'</table></div>':'<p class="muted">なし</p>';
+  $('statusBox').innerHTML=h;
+}
+async function confirmEntries(){
+  const ids=[...document.querySelectorAll('.sck:checked')].map(c=>c.value);
+  if(!ids.length) return toast('確認する取引にチェックしてください');
+  if(!staff()) return toast('担当者名を入力してください');
+  const r=await api('confirm',{ids,staff:staff()}); toast(r.updated+'件を店舗確認済にしました'); loadStatus(); refreshAlerts();
+}
+async function approve(i){
+  const x=window._rep[i];
+  const name=prompt(`補充申請（申請額 ${yen(x.金額B)}）を承認します。店長の氏名を入力してください`); if(!name) return;
+  await api('approveReport',{id:x.id,staff:name.trim()}); toast('承認しました'); loadStatus(); refreshAlerts();
+}
+async function monthAct(op){
+  if(!staff()) return toast('担当者名を入力してください');
+  const p={store:store(),month:$(op==='ledger'?'lMonth':'sMonth').value,staff:staff(),op};
+  if(op==='original'){ if($('origN').value.trim()==='') return toast('枚数を入力してください'); p.sheets=num($('origN').value); }
+  if(op==='close' && !confirm('当月の投稿は以上で締めます。よろしいですか？')) return;
+  await api('monthAction',p); toast('記録しました');
+  op==='ledger'?loadStoreLedger():loadStatus(); refreshAlerts();
+}
+
+/* ===== 元帳表示（共通） ===== */
+function ledgerTable(L, mode){
+  let h=`<p class="muted">繰越日: ${L.carryDate||'未設定'}　月初残高 <b>${yen(L.opening)}</b>　月末帳簿残高 <b>${yen(L.closing)}</b></p>`;
+  const ck = mode==='store';
+  h+=`<div class="tw"><table><thead><tr>${ck?'<th class="noprint">確認</th>':''}<th>日付</th><th>区分</th><th>相手先</th><th>内容</th><th>勘定科目</th><th>入金</th><th>出金</th><th>残高</th><th>証憑</th><th>状態</th><th>本社メモ</th></tr></thead><tbody>`;
+  h+=`<tr class="cnt"><td colspan="${ck?12:11}">前月より繰越　${yen(L.opening)}</td></tr>`;
+  L.rows.forEach(o=>{
+    if(o.row==='count'){
+      const ng=o.差異!==0;
+      h+=`<tr class="cnt ${ng?'ng':''}"><td colspan="${ck?12:11}">${o.日付.slice(5)}　【${esc(o.種別)}】有高 ${yen(o.合計)}　帳簿 ${yen(o.帳簿)}　差異 <span class="${ng?'ng':'ok'}">${ng?yen(o.差異):'一致'}</span>　${imgLink(o.画像ID)}　<span class="muted">${esc(o.入力者)}${o.実施者?' / 実施:'+esc(o.実施者):''}${o.照合?' / 照合:'+esc(o.照合):''} ${esc(o.本社メモ||'')}</span></td></tr>`;
+    } else {
+      h+=`<tr>${ck?`<td class="c noprint">${o.状態==='入力済'?`<input type="checkbox" class="ck" value="${o.id}" style="width:auto">`:''}</td>`:''}
+      <td class="d">${o.日付.slice(5)}</td><td class="c">${typeTxt(o.区分)}</td><td>${esc(o.相手先)}</td><td>${esc(o.摘要)}<div class="muted">${esc(o.登録者)}</div></td>
+      <td>${esc(o.勘定科目)}${o.補助科目?'<div class="muted">'+esc(o.補助科目)+'</div>':''}</td>
+      <td class="n">${IN[o.区分]?yen(o.金額):''}</td><td class="n">${IN[o.区分]?'':yen(o.金額)}</td><td class="n">${yen(o.残高)}</td>
+      <td class="c">${imgLink(o.画像ID)}</td><td class="c">${kindBadge(o.状態)}</td><td>${esc(o.本社メモ)}</td></tr>`;
+    }
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
+async function loadStoreLedger(){
+  const month=$('lMonth').value;
+  const r=await api('storeMonth',{store:store(),month});
+  const ms=r.monthStatus||{};
+  if(!r.ledger){
+    $('sLedgerBox').innerHTML=`<div class="notice info">${month.replace('-','年')}月分の元帳は<b>まだ開示されていません</b>。<br>月末実査の報告後、本社が検証してから開示します（原則3：実査先行）。</div>`; return;
+  }
+  let h=ledgerTable(r.ledger,'store');
+  h+=`<div class="notice info" style="margin-top:10px">確認すること：①身に覚えのない取引がないか ②自分が送った証憑がすべて計上されているか。相違があれば本社経理担当者へ連絡してください。</div>`;
+  if(r.ledger.rows.some(o=>o.row==='entry'&&o.状態==='入力済')) h+=`<button class="btn big sub" onclick="confirmChecked()">チェックした行を「確認済」にする</button>`;
+  h+= ms.元帳確認日時 ? `<p class="ok" style="text-align:center">✔ ${esc(ms.元帳確認者)} が元帳確認完了を報告済み（${esc(ms.元帳確認日時)}）</p>`
+     : `<button class="btn big ok" onclick="ledgerDone()">元帳確認完了を報告する</button>`;
+  $('sLedgerBox').innerHTML=h;
+}
+async function confirmChecked(){
+  const ids=[...document.querySelectorAll('.ck:checked')].map(c=>c.value);
+  if(!ids.length) return toast('確認する行にチェックしてください');
+  if(!staff()) return toast('担当者名を入力してください');
+  const r=await api('confirm',{ids,staff:staff()}); toast(r.updated+'件を確認済にしました'); loadStoreLedger();
+}
+async function ledgerDone(){
+  const left=document.querySelectorAll('.ck').length;
+  if(left && !confirm(`未チェックの行が${left}件あります。すべて確認して問題なければ「OK」を押してください（全行を確認済にします）。`)) return;
+  if(!staff()) return toast('担当者名を入力してください');
+  const ids=[...document.querySelectorAll('.ck')].map(c=>c.value);
+  if(ids.length) await api('confirm',{ids,staff:staff()},true);
+  await monthAct('ledger');
+}
+
+/* ===== 本社 ===== */
+async function hqLogin(silent){
+  const pass = silent ? hqPass : $('hqPass').value;
+  if(!silent && !$('hqName').value.trim()) return toast('担当者名を入力してください');
+  try{ await api('hqAuth',{pass}); }catch(e){ try{sessionStorage.removeItem('keiri_hq')}catch(_){}; hqPass=''; return; }
+  hqPass=pass; try{sessionStorage.setItem('keiri_hq',pass)}catch(e){}
+  if(!silent) ls.set('keiri_hqname',$('hqName').value.trim());
+  $('hqLogin').classList.add('hide'); $('hqBody').classList.remove('hide');
+  loadJournal();
+}
+const hq = (a,p,q) => api(a,Object.assign({pass:hqPass,by:$('hqName').value.trim()},p||{}),q);
+function onHqTab(t){ ({journal:loadJournal,counts:loadCounts,month:loadMonth,reports:loadReports,setting:loadCarry})[t](); }
+
+/* 受付・入力 */
+let jRows=[];
+async function loadJournal(){
+  jRows = await hq('hqList',{store:$('jStore').value,month:$('jMonth').value,status:$('jStatus').value});
+  const ac=M.accounts;
+  const opt=(t,cur)=>{ const k=IN[t]?'収受':'支払';
+    return '<option value="">（未選択）</option>'+ac.filter(a=>a.kind===k||a.kind==='共通'||!a.kind).map(a=>`<option ${a.name===cur?'selected':''}>${esc(a.name)}</option>`).join('')+(cur&&!ac.some(a=>a.name===cur)?`<option selected>${esc(cur)}</option>`:''); };
+  let h=`<p class="muted">${jRows.length}件　※勘定奉行へ入力したらチェックして「本社処理済」に（店舗に確認依頼が届きます）。科目・金額を変えるとチェックが入ります。</p><div class="tw"><table><thead><tr><th><input type="checkbox" style="width:auto" onclick="document.querySelectorAll('.jk').forEach(c=>c.checked=this.checked)"></th><th>日付</th><th>事業所</th><th>区分</th><th>相手先</th><th>内容</th><th>金額</th><th>証憑</th><th>勘定科目</th><th>補助</th><th>本社メモ</th><th>状態</th><th></th></tr></thead><tbody>`;
+  jRows.forEach((o,i)=>{
+    h+=`<tr><td class="c"><input type="checkbox" class="jk" data-i="${i}" style="width:auto"></td><td class="d">${o.日付}</td><td>${esc(o.店舗)}</td><td class="c">${typeTxt(o.区分)}</td>
+    <td>${esc(o.相手先)}</td><td>${esc(o.摘要)}<div class="muted">${esc(o.登録者)} ${esc(o.登録日時.slice(5,16))}</div></td>
+    <td><input class="s" id="ja${i}" value="${o.金額}" style="width:86px;text-align:right" onchange="chk(${i})"></td><td class="c">${imgLink(o.画像ID)}</td>
+    <td><select class="acct" id="jc${i}" onchange="chk(${i})">${opt(o.区分,o.勘定科目)}</select></td>
+    <td><input class="s" id="js${i}" value="${esc(o.補助科目)}" onchange="chk(${i})"></td>
+    <td><input class="s" id="jm${i}" value="${esc(o.本社メモ)}" onchange="chk(${i})"></td>
+    <td class="c">${kindBadge(o.状態)}</td><td><button class="btn sm danger" onclick="returnEntry(${i})">差戻し</button></td></tr>`;
+  });
+  $('journalBox').innerHTML=h+'</tbody></table></div>'; $('journalSave').classList.toggle('hide',!jRows.length);
+  loadLatestCounts();
+}
+async function loadLatestCounts(){
+  const stores=$('jStore').value?[$('jStore').value]:[...new Set(jRows.map(o=>o.店舗))];
+  const box=$('latestBox'); if(!stores.length){ box.innerHTML=''; return; }
+  const all=await hq('hqCounts',{store:$('jStore').value},true);
+  const latest={}; all.forEach(c=>{ if(!latest[c.店舗]) latest[c.店舗]=c; });
+  box.innerHTML=`<h3>各事業所の最新の現金有高</h3><div class="tw"><table><thead><tr><th>事業所</th><th>投稿日時</th><th>種別</th><th>有高</th><th>帳簿残高</th><th>差異</th><th>有高表</th><th>照合</th><th></th></tr></thead><tbody>`+
+   stores.map(s=>{const c=latest[s]; if(!c) return `<tr><td>${esc(s)}</td><td colspan="8" class="muted">有高の投稿なし</td></tr>`; const ng=c.差異!==0;
+    return `<tr><td>${esc(s)}</td><td class="d">${esc(c.日付.slice(5))} ${esc(c.登録日時.slice(11,16))}</td><td>${esc(c.種別)}</td><td class="n"><b>${yen(c.合計)}</b></td><td class="n">${yen(c.帳簿)}</td><td class="n ${ng?'ng':'ok'}">${ng?yen(c.差異):'一致'}</td><td class="c">${imgLink(c.画像ID)}</td><td>${c.照合?kindBadge(c.照合):kindBadge('照合待ち')}</td><td><span class="link" onclick="pastCounts('${esc(s)}')">過去分</span></td></tr>`}).join('')+'</tbody></table></div>';
+}
+function pastCounts(s){ $('cStore').value=s; $('cMonth').value=''; $('cAll').checked=true; $('cOpen').checked=false; openTab('htabs','h-','counts',onHqTab); }
+function chk(i){ document.querySelector(`.jk[data-i="${i}"]`).checked=true; }
+async function saveJournal(){
+  const items=[...document.querySelectorAll('.jk:checked')].map(c=>{const i=c.dataset.i;return{id:jRows[i].id,account:$('jc'+i).value,sub:$('js'+i).value.trim(),hqMemo:$('jm'+i).value.trim(),amount:num($('ja'+i).value)}});
+  if(!items.length) return toast('行にチェックしてください');
+  const r=await hq('hqJournal',{items}); toast(r.updated+'件を本社処理済にしました'); loadJournal();
+}
+async function returnEntry(i){
+  const memo=prompt('差戻し理由（店舗に表示されます）',$('jm'+i).value||'証憑の写真が読めません。撮り直してください'); if(memo==null) return;
+  await hq('hqReturn',{id:jRows[i].id,hqMemo:memo}); toast('差戻しました'); loadJournal();
+}
+
+/* 有高照合 */
+let cRows=[];
+async function loadCounts(){
+  const all=await hq('hqCounts',{store:$('cStore').value,month:$('cMonth').value});
+  const seen={}; all.forEach(c=>{const k=c.店舗+'|'+c.日付; c._old=!!seen[k]; seen[k]=1;}); // 新しい順で返る→各日の先頭が最新
+  cRows=all.filter(c=>($('cAll').checked||!c._old)&&(!$('cOpen').checked||!c.照合));
+  let h=`<p class="muted">${$('cAll').checked?'同じ日の古い有高も表示しています（「旧」）':'各事業所・各日の<b>最新の有高</b>のみ表示しています'}</p>`+`<div class="tw"><table><thead><tr><th>日付</th><th>事業所</th><th>種別</th><th>有高</th><th>帳簿残高</th><th>差異</th><th>有高表</th><th>投稿者</th><th>照合</th><th></th></tr></thead><tbody>`;
+  cRows.forEach((c,i)=>{ const ng=c.差異!==0;
+    h+=`<tr${c._old?' style="opacity:.55"':''}><td class="d">${c._old?'<span class="badge b-未">旧</span> ':''}${c.日付}<div class="muted">${esc(c.登録日時.slice(11,16))}</div></td><td>${esc(c.店舗)}</td><td>${esc(c.種別)}${c.実施者?'<div class="muted">実施:'+esc(c.実施者)+'</div>':''}</td>
+    <td class="n">${yen(c.合計)}</td><td class="n">${yen(c.帳簿)}</td><td class="n ${ng?'ng':'ok'}">${ng?yen(c.差異):'一致'}</td><td class="c">${imgLink(c.画像ID)}</td><td>${esc(c.入力者)}</td>
+    <td>${c.照合?kindBadge(c.照合)+' <span class="muted">'+esc(c.照合者)+' '+esc(c.本社メモ)+'</span>':kindBadge('照合待ち')}</td>
+    <td>${c.照合||c._old?'':`<button class="btn sm ok" onclick="checkCount(${i},'一致')">一致</button> <button class="btn sm danger" onclick="checkCount(${i},'差異')">差異</button>`}</td></tr>`; });
+  h+='</tbody></table></div>';
+  if(!cRows.length) h+='<p class="muted">該当なし</p>';
+  $('countsBox').innerHTML=h;
+}
+async function checkCount(i,res){
+  const c=cRows[i]; let memo='';
+  if(res==='一致' && c.差異!==0 && !confirm(`計算上 ${yen(c.差異)} の差異があります。一致として記録しますか？`)) return;
+  if(res==='差異'){ memo=prompt('店舗への連絡内容（差異の内容・確認依頼）',`帳簿 ${yen(c.帳簿)}／実有高 ${yen(c.合計)}／差異 ${yen(c.差異)}　ご確認ください`); if(memo==null) return; }
+  await hq('hqCheckCount',{id:c.id,result:res,book:c.帳簿,hqMemo:memo}); toast('記録しました'); loadCounts();
+}
+
+/* 月次・開示 */
+let mRows=[];
+async function loadMonth(){
+  const month=$('mMonth').value;
+  mRows=await hq('hqMonth',{month});
+  const day=86400000;
+  let h=`<div class="tw"><table><thead><tr><th>事業所</th><th>前月末</th><th>＋補充</th><th>＋収受</th><th>－支払</th><th>－返納</th><th>帳簿月末</th><th>月末実査</th><th>差異</th><th>取引状態</th><th>有高</th><th>締め</th><th>開示</th><th>元帳確認</th><th>原本</th><th>最新有高</th><th>第三者実査</th><th>報告</th></tr></thead><tbody>`;
+  mRows.forEach((r,i)=>{
+    const me=r.monthEnd, diff=me?me.total-r.closing:null, m=r.month||{};
+    const lc=r.lastCount; const lim=lc?(lc.total>M.limitMax?'<span class="ng">上限超</span>':lc.total<M.limitRefill?'<span class="ng">補充基準</span>':''):'';
+    const third=r.lastThird?Math.floor((Date.now()-new Date(r.lastThird))/day):null;
+    h+=`<tr><td><span class="link" onclick="viewLedger('${esc(r.store)}')">${esc(r.store)}</span></td>
+    <td class="n">${yen(r.opening)}</td><td class="n">${yen(r.sum.補充受領)}</td><td class="n">${yen(r.sum.収受)}<div class="muted">${r.cnt.収受}件</div></td><td class="n">${yen(r.sum.支払)}<div class="muted">${r.cnt.支払}件</div></td><td class="n">${yen(r.sum.返納)}</td>
+    <td class="n"><b>${yen(r.closing)}</b></td>
+    <td class="n">${me?yen(me.total)+' '+imgLink(me.images):'<span class="muted">未報告</span>'}</td>
+    <td class="n">${diff==null?'-':diff===0?'<span class="ok">一致</span>':`<span class="ng">${yen(diff)}</span>`}</td>
+    <td>${r.status.未処理?`<span class="ng">未処理${r.status.未処理}</span> `:''}${r.status.差戻し?`差戻${r.status.差戻し} `:''}<span class="muted">入力済${r.status.入力済} 確認済${r.status.確認済}</span></td>
+    <td>${r.pendingCountDays?`<span class="ng">未投稿${r.pendingCountDays}日</span> `:''}${r.openCounts?`未照合${r.openCounts} `:''}${r.diffCounts?`<span class="ng">差異${r.diffCounts}</span>`:''}</td>
+    <td class="c">${m.締め日時?kindBadge('済'):kindBadge('未')}</td>
+    <td class="c">${m.開示日時?kindBadge('済')+`<div class="muted">${esc(m.開示日時.slice(5,10))}</div>`:`<button class="btn sm" ${me?'':'disabled title="月末実査の報告後に開示できます"'} onclick="disclose(${i})">開示</button>`}</td>
+    <td class="c">${m.元帳確認日時?kindBadge('済'):m.開示日時?kindBadge('確認待ち'):'-'}</td>
+    <td class="c">${m.原本送付日時?`${esc(m.原本枚数)}枚 `+(m.原本照合日時?kindBadge('済'):`<button class="btn sm" onclick="orig(${i})">照合済</button>`):'<span class="muted">未送付</span>'}</td>
+    <td class="n">${lc?yen(lc.total)+'<div class="muted">'+lc.date.slice(5)+' '+lim+'</div>':'-'}</td>
+    <td class="c">${r.lastThird?`${r.lastThird.slice(2)}${third>90?'<div class="ng">90日超</div>':''}`:'<span class="ng">未実施</span>'}</td>
+    <td class="c">${r.openReports?`<span class="ng">${r.openReports}</span>`:'0'}</td></tr>`;
+  });
+  $('monthBox').innerHTML=h+'</tbody></table></div>';
+}
+async function disclose(i){
+  const r=mRows[i]; const diff=r.monthEnd.total-r.closing;
+  if(diff!==0 && !confirm(`月末実査と帳簿に ${yen(diff)} の差異があります。原則として差異調査（第11章）を先に行います。それでも開示しますか？`)) return;
+  if(r.status.未処理 && !confirm(`未処理の取引が${r.status.未処理}件あります。開示しますか？`)) return;
+  await hq('hqDisclose',{store:r.store,month:$('mMonth').value}); toast(r.store+'の元帳を開示しました'); loadMonth();
+}
+async function orig(i){
+  const r=mRows[i]; const memo=prompt(`${r.store}：原本 ${r.month.原本枚数}枚を受領し、入力件数と照合しました。メモ（任意）`,''); if(memo==null) return;
+  await hq('hqOriginal',{store:r.store,month:$('mMonth').value,hqMemo:memo}); toast('記録しました'); loadMonth();
+}
+async function viewLedger(s){
+  const L=await hq('hqLedger',{store:s,month:$('mMonth').value});
+  const ms=L.monthStatus||{};
+  $('modalBody').innerHTML=`<h3 style="margin:0 0 6px">${esc(s)}　${L.month.replace('-','年')}月　現金元帳</h3><p class="muted">開示: ${esc(ms.開示日時||'未')}　元帳確認: ${esc(ms.元帳確認者||'未')} ${esc(ms.元帳確認日時||'')}</p>`+ledgerTable(L,'hq')+
+   (ms.開示日時?`<p style="text-align:right"><button class="btn sm danger" onclick="undoDisclose('${esc(s)}')">開示を取り消す</button></p>`:'');
+  $('modal').style.display='flex';
+}
+async function undoDisclose(s){ if(!confirm('開示を取り消しますか？')) return; await hq('hqDisclose',{store:s,month:$('mMonth').value,undo:true}); closeModal(); loadMonth(); }
+async function exportCsv(){
+  const month=$('mMonth').value;
+  const rows=(await hq('hqList',{month,status:'すべて'})).filter(o=>o.状態==='入力済'||o.状態==='確認済');
+  const head=['日付','事業所','区分','借方科目','借方補助','貸方科目','貸方補助','金額','相手先','摘要','状態','登録者','処理者'];
+  const lines=[head].concat(rows.map(o=>{const inc=IN[o.区分];
+    return [o.日付,o.店舗,o.区分,inc?'現金':o.勘定科目,inc?o.店舗:o.補助科目,inc?o.勘定科目:'現金',inc?o.補助科目:o.店舗,o.金額,o.相手先,o.摘要,o.状態,o.登録者,o.処理者];}));
+  const csv='﻿'+lines.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=`店舗現金_仕訳_${month}.csv`; a.click();
+  toast(rows.length+'件を出力しました（入力済・確認済のみ）');
+}
+
+/* 申請・報告 */
+let rRows=[];
+async function loadReports(){
+  rRows=await hq('hqReports',{store:$('rStore').value,open:$('rOpen').checked});
+  let h=`<div class="tw"><table><thead><tr><th>投稿日時</th><th>事業所</th><th>種別</th><th>内容</th><th>投稿者</th><th>状態</th><th>添付</th><th>本社対応</th><th></th></tr></thead><tbody>`;
+  rRows.forEach((x,i)=>{
+    h+=`<tr><td class="d">${esc(x.登録日時.slice(5,16))}</td><td>${esc(x.店舗)}</td><td>${esc(x.種別)}</td>
+    <td>${x.種別==='補充申請'?`現在残高 ${yen(x.金額A)}／申請額 <b>${yen(x.金額B)}</b><br>`:(x.金額A!==''?`差異 ${yen(x.金額A)}<br>`:'')}${esc(x.内容)}</td><td>${esc(x.登録者)}</td>
+    <td class="c">${kindBadge(x.状態)}${x.店長承認者?'<div class="muted">承認:'+esc(x.店長承認者)+'</div>':''}</td><td class="c">${imgLink(x.画像ID)}</td>
+    <td>${esc(x.本社対応)}<div class="muted">${esc(x.対応者)}</div></td>
+    <td>${x.状態==='対応済'?'':`<button class="btn sm ok" ${x.状態==='承認待ち'?'title="店長承認前"':''} onclick="doneReport(${i})">対応済</button>`}</td></tr>`;
+  });
+  $('reportsBox').innerHTML=rRows.length?h+'</tbody></table></div>':'<p class="muted">該当なし</p>';
+}
+async function doneReport(i){
+  const x=rRows[i];
+  if(x.状態==='承認待ち' && !confirm('店長の承認がまだありません（原則は処理しない）。対応済にしますか？')) return;
+  const memo=prompt('対応内容（店舗に表示されます）',x.種別==='補充申請'?`補充 ${yen(x.金額B)} を手配しました`:''); if(memo==null) return;
+  await hq('hqReportDone',{id:x.id,hqMemo:memo}); toast('対応済にしました'); loadReports();
+}
+
+/* 繰越 */
+async function loadCarry(){
+  const st=await hq('hqStores');
+  $('carryBox').innerHTML=`<div class="tw"><table><thead><tr><th>事業所</th><th>繰越日</th><th>繰越残高（円）</th><th></th></tr></thead><tbody>`+
+    st.map((s,i)=>`<tr><td>${esc(s.店舗)}</td><td><input type="date" id="cd${i}" value="${esc(s.繰越日)}"></td><td><input id="ca${i}" inputmode="numeric" value="${esc(s.繰越残高)}" style="text-align:right"></td><td><button class="btn sm" onclick="saveCarry('${esc(s.店舗)}',${i})">保存</button></td></tr>`).join('')+'</tbody></table></div>';
+}
+async function saveCarry(s,i){
+  if(!$('cd'+i).value) return toast('繰越日を入力してください');
+  await hq('hqSetCarry',{store:s,date:$('cd'+i).value,amount:num($('ca'+i).value)}); toast(s+'の繰越を保存しました');
+}
+</script>
+</body>
+</html>
