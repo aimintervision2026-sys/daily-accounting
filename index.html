@@ -469,7 +469,9 @@ async function runCountOcr(img){
     const link=' <span class="link" onclick="showCntDetail()">内訳を見る</span>　<span class="link" onclick="lastCntHi&&runCountOcr(lastCntHi)">もう一度読み取る</span>';
     if(okAll && r.confidence!=='low'){ msg.className='hint ok'; msg.innerHTML=`✔ ${dd}総計 ${yen(total)}（検算OK）。有高表と同じか確認してください。${link}`; }
     else { msg.className='hint'; msg.innerHTML=`<span class="ng">⚠ ${dd}総計 ${yen(total)} と読み取りましたが、${okAll?'読み取りに自信がありません':'小計・合計の検算が合いません'}。必ず有高表を見て金額を確認・修正してください。</span>${link}`; }
-  }catch(e){ msg.className='hint'; msg.textContent='自動読み取りは使えませんでした（手入力してください）【'+(e&&e.message||e)+'】'; }
+  }catch(e){ const em=String(e&&e.message||e);
+    if(/BUSY/.test(em)){ msg.className='hint'; msg.innerHTML='⏳ 読み取りサービスが混み合っています。少し待って <span class="link" onclick="lastCntHi&&runCountOcr(lastCntHi)">もう一度読み取る</span> を押すか、手入力してください。'; }
+    else { msg.className='hint'; msg.textContent='自動読み取りは使えませんでした（手入力してください）【'+em+'】'; } }
 }
 function showCntDetail(){
   const r=lastCnt||{}; const n=k=>Number(r[k])||0;
@@ -490,13 +492,13 @@ function parseRehab(lines,text,ok){
   const nm=lines.find(L=>/様\s*$/.test(L)&&!/(寿リハ|エイム|リハビリ)/.test(L)&&!/\d/.test(L));
   if(nm) r.partner=nm.replace(/\s*様\s*$/,'').replace(/\s+/g,' ').trim()+' 様';
   // 領収日（手書き）: 「領収日」の行かその次の行
-  const di=lines.findIndex(L=>/領収日/.test(L));
+  const di=lines.findIndex(L=>/領[収收]日/.test(L));
   if(di>=0){ const seg=(lines[di]+' '+(lines[di+1]||'')).replace(/\s/g,'');
-    let m=seg.match(/(?:令和|R)?(\d{1,2}|元)年(\d{1,2})月(\d{1,2})日/); if(m) r.date=ok(2018+(m[1]==='元'?1:+m[1]),+m[2],+m[3]);
+    let m=seg.match(/(?:[令今合]和|R)?(\d{1,2}|元)年(\d{1,2})月(\d{1,2})日/); if(m) r.date=ok(2018+(m[1]==='元'?1:+m[1]),+m[2],+m[3]);
     if(!r.date){ m=seg.match(/(20\d{2})[年\/.\-](\d{1,2})[月\/.\-](\d{1,2})/); if(m) r.date=ok(+m[1],+m[2],+m[3]); } }
   // 内容: 「サービス利用料 令和8年9月分」
-  const t2=text.replace(/\s/g,''); const mm=t2.match(/(?:令和|R)(\d{1,2})年(\d{1,2})月分/);
-  r.memo=mm?`サービス利用料 ${+mm[2]}月分`:(/サービス利用料/.test(t2)?'サービス利用料':'');
+  const t2=text.replace(/\s/g,''); const mm=t2.match(/(?:[令今合]和|R)(\d{1,2})年(\d{1,2})月分/);
+  r.memo=mm?`サービス利用料 ${+mm[2]}月分`:(/利用料/.test(t2)?'サービス利用料':'');
   return r;
 }
 async function runOcr(img){
@@ -530,7 +532,7 @@ function parseReceipt(raw){
     [/(?:令和|R)\s*(\d{1,2}|元)\s*[年\/.\-]\s*(\d{1,2})\s*[月\/.\-]\s*(\d{1,2})/gi, m=>ok(2018+(m[1]==='元'?1:+m[1]),+m[2],+m[3])],
     [/(?:^|[^\d])(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{1,2})(?![\d])/g, m=>{const a=+m[1]; return ok(a>=20?2000+a:2018+a,+m[2],+m[3]);}]
   ];
-  if(/領収書/.test(text.replace(/\s/g,''))&&/(但し|上記正に領収|サービス利用料)/.test(text.replace(/\s/g,''))) return parseRehab(lines,text,ok);
+  if(/領[収收]書/.test(text.replace(/\s/g,''))&&/(但し|但L|上記正に領[収收]|利用料)/.test(text.replace(/\s/g,''))) return parseRehab(lines,text,ok);
   for(const [re,fn] of pats){ if(res.date) break; for(const m of text.matchAll(re)){ const v=fn(m); if(v){res.date=v;break;} } }
   // 金額
   const bad=/(預|釣|つり|ポイント|TEL|電話|No\.|番号|登録|点数|数量|個)/i;
