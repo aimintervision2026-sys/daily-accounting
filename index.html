@@ -265,7 +265,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
             <div style="align-self:flex-end"><button class="btn" onclick="loadJournal()">表示</button></div>
           </div>
           <div id="journalBox" style="margin-top:10px"></div>
-          <button class="btn big hide" id="journalSave" onclick="saveJournal()">まとめて処理済にして返信（表示中の全グループ）</button>
+          <button class="btn big ok hide" id="journalSave" onclick="saveJournal()">✔ 処理済にして店舗へ返信（チェックした取引・元帳残高・元帳スクショ）</button>
         </div>
 
         <div id="h-counts" class="card hide">
@@ -856,7 +856,7 @@ async function loadJournal(){
       <div class="blk">奉行の元帳残高<br><input class="s lb" id="lb${gi}" inputmode="numeric" value="${bk==null?'':bk.toLocaleString()}" placeholder="例 27,500" style="width:130px;text-align:right;font-size:16px" ${c?`oninput="lbDiff(${gi},${c.合計})"`:''}></div>
       <div class="blk">差異<br><span id="ld${gi}" style="font-size:16px">${!c?'-':df==null?'-':df===0?'<span class="ok">一致</span>':`<span class="ng">${yen(df)}</span>`}</span></div>
       <div class="blk">元帳（スクショ）<br><label class="btn sm sub" style="cursor:pointer">📎元帳を添付<input type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="addGrpImg(${gi},this)"></label><div class="thumbs" id="gt${gi}"></div></div>
-      <div class="blk" style="flex:1;text-align:right"><button class="btn ok" onclick="processGroup(${gi})">✔ 処理済にして返信</button>${c?`<br><span class="link" style="font-size:12px" onclick="pastCounts('${esc(G.store)}')">この事業所の過去の有高</span>`:''}</div>
+      <div class="blk" style="flex:1;text-align:right">${c?`<span class="link" style="font-size:12px" onclick="pastCounts('${esc(G.store)}')">この事業所の過去の有高</span>`:''}</div>
     </div></div>`;
   });
   $('journalBox').innerHTML=h; $('journalSave').classList.toggle('hide',!jGroups.length);
@@ -902,7 +902,7 @@ function pastCounts(s){
 }
 function chk(i){ document.querySelector(`.jk[data-i="${i}"]`).checked=true; }
 async function saveJournal(){
-  if(!confirm('表示中のすべてのグループを、チェックした取引で「処理済」にして返信します。よろしいですか？')) return;
+  if(!confirm('チェックした取引を「処理済」にし、入力した元帳残高・添付した元帳を店舗へ返信します。よろしいですか？')) return;
   busy(true); let n=0, m=0;
   try{ for(let gi=0;gi<jGroups.length;gi++){ const r=await sendGroup(gi); n+=r.n; if(r.sent) m++; } toast(`${n}件を処理済にしました（返信 ${m}件）`); }
   finally{ busy(false); }
