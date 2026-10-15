@@ -264,6 +264,10 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
             <div><label class="f">状態</label><select id="jStatus"><option>未処理</option><option>差戻し</option><option value="入力済">本社処理済</option><option value="確認済">店舗確認済</option><option>すべて</option></select></div>
             <div style="align-self:flex-end"><button class="btn" onclick="loadJournal()">表示</button></div>
           </div>
+          <div class="box noprint" style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <div style="flex:1;min-width:240px"><b>📦 証憑の保存（共有フォルダ用）</b><div class="hint" id="zipInfo">読み込み中…</div></div>
+            <button class="btn" onclick="downloadNew()">未保存分をZIPでダウンロード</button>
+          </div>
           <div id="journalBox" style="margin-top:10px"></div>
           <button class="btn big ok hide" id="journalSave" onclick="saveJournal()">✔ 処理済にして店舗へ返信（チェックした取引・元帳残高・元帳スクショ）</button>
         </div>
@@ -286,6 +290,13 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
             <div style="align-self:flex-end"><button class="btn" onclick="loadMonth()">表示</button> <button class="btn sub" onclick="exportCsv()">仕訳CSV出力</button></div></div>
           <p class="formula">前月末残高 ＋ 補充 ＋ 収受 － 支払 － 返納 ＝ 帳簿月末残高 ⇔ 月末実査の有高</p>
           <div id="monthBox"></div>
+          <div class="box noprint" style="margin-top:14px">
+            <b>📦 証憑の一括ダウンロード</b>
+            <p class="hint">対象月の領収書・有高表・元帳・申請の画像を、事業所ごとにZIPでダウンロードします（ファイル名に日付・区分・金額・相手先、一覧.csv付き）。ダウンロードしたZIPを展開して、共有フォルダの各店舗フォルダへ保存してください。</p>
+            <div class="row"><div><label class="f">事業所</label><select id="zStore" class="hqStoreSel"></select></div>
+              <div style="align-self:flex-end"><button class="btn" onclick="downloadZips()">ZIPをダウンロード</button></div></div>
+            <div id="zipMsg" class="hint"></div>
+          </div>
         </div>
 
         <div id="h-reports" class="card hide">
@@ -860,6 +871,30 @@ async function loadJournal(){
     </div></div>`;
   });
   $('journalBox').innerHTML=h; $('journalSave').classList.toggle('hide',!jGroups.length);
+  loadZipInfo();
+}
+async function loadZipInfo(){
+  try{ const r=await hq('hqZipInfo',{},true);
+    $('zipInfo').innerHTML=`前回保存：${r.last?esc(r.last.slice(5,16)):'まだなし'}　／　<b>未保存 ${r.pending}件</b>　<span class="muted">ZIPを開いて中のフォルダを全部選択→「現金 請求書および領収書」フォルダに貼り付け</span>`;
+  }catch(e){ $('zipInfo').textContent=''; }
+}
+function saveB64(b64,name){ const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([u],{type:'application/zip'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},5000); }
+async function downloadNew(){
+  busy(true);
+  try{
+    let part=0, parts=1, until=null, since=null, n=0;
+    do{
+      const r=await hq('hqZipNew',{part,until,since},true);
+      if(!r.count){ toast('未保存の証憑はありません'); return; }
+      parts=r.parts; until=r.until; since=r.since; n=r.count;
+      saveB64(r.data,r.name); await new Promise(res=>setTimeout(res,700)); part++;
+    }while(part<parts);
+    if(confirm(`ZIP ${parts}個（画像 ${n}枚）をダウンロードしました。\n共有フォルダへの保存が済んだら「OK」を押してください（次回からは今回より後の分だけになります）。\n※うまく保存できなかった場合は「キャンセル」→もう一度ダウンロードできます。`)){
+      await hq('hqZipDone',{until},true); toast('保存済みにしました');
+    }
+  }catch(e){ toast('作成できませんでした：'+(e.message||e),4000); }
+  finally{ busy(false); loadZipInfo(); }
 }
 async function addGrpImg(gi,inp){ const files=[...inp.files]; inp.value=''; for(const f of files){ try{ (grpImgs[gi]=grpImgs[gi]||[]).push(await compress(f,2000,0.85)); }catch(e){ toast(e.message); } } drawGrpImgs(gi); }
 function drawGrpImgs(gi){ $('gt'+gi).innerHTML=(grpImgs[gi]||[]).map((d,i)=>`<div>${d.startsWith('data:application/pdf')?'<div class="pdf">PDF</div>':`<img src="${d}">`}<span class="x" onclick="event.stopPropagation();grpImgs[${gi}].splice(${i},1);drawGrpImgs(${gi})">×</span></div>`).join(''); }
@@ -982,6 +1017,29 @@ async function viewLedger(s){
   $('modal').style.display='flex';
 }
 async function undoDisclose(s){ if(!confirm('開示を取り消しますか？')) return; await hq('hqDisclose',{store:s,month:$('mMonth').value,undo:true}); closeModal(); loadMonth(); }
+async function downloadZips(){
+  const month=$('mMonth').value; if(!month) return toast('対象月を選んでください');
+  const stores=$('zStore').value?[$('zStore').value]:M.stores;
+  const msg=$('zipMsg'); let total=0, files=0;
+  busy(true);
+  try{
+    for(const st of stores){
+      msg.textContent=`${st} を作成中…`;
+      let part=0, parts=1;
+      do{
+        const r=await hq('hqZip',{store:st,month,part},true);
+        if(!r.count){ break; }
+        parts=r.parts; total+=part===0?r.count:0; files++;
+        const bin=atob(r.data), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+        const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([u],{type:'application/zip'})); a.download=r.name; document.body.appendChild(a); a.click(); setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},5000);
+        await new Promise(res=>setTimeout(res,600));
+        part++;
+      }while(part<parts);
+    }
+    msg.textContent=files?`✔ ZIP ${files}個（画像 ${total}枚）をダウンロードしました。`:'この月の証憑はありません。';
+  }catch(e){ msg.textContent='作成できませんでした：'+(e.message||e); }
+  finally{ busy(false); }
+}
 async function exportCsv(){
   const month=$('mMonth').value;
   const rows=(await hq('hqList',{month,status:'すべて'})).filter(o=>o.状態==='入力済'||o.状態==='確認済');
