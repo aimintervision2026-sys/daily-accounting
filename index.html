@@ -256,7 +256,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
           <button data-t="journal" class="on">受付・入力</button>
           <button data-t="month">月次・開示</button>
           <button data-t="reports">申請・報告</button>
-          <button data-t="setting">繰越設定</button>
+          <button data-t="setting">設定</button>
         </div>
 
         <div id="h-journal" class="card">
@@ -318,6 +318,14 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
           <h2>繰越設定</h2>
           <p class="muted">運用開始日（繰越日）と、その日の開始時点の現金残高（移行時の実査額）を設定します。繰越日より前の取引は計算に含めません。</p>
           <div id="carryBox"></div>
+          <h2 style="margin-top:22px">本社への定時通知</h2>
+          <p class="muted">毎日決まった時刻に、前回の通知以降に店舗から来た件数（入出金・有高・申請報告）を店舗別に通知します。0件の日は通知しません。</p>
+          <div class="row" style="align-items:flex-end;gap:8px;flex-wrap:wrap">
+            <div><label class="f">通知時刻</label><select id="ntHour"></select></div>
+            <button class="btn" onclick="saveNotify()">保存</button>
+            <button class="btn sub" onclick="testNotifyHq()">テスト送信</button>
+          </div>
+          <p class="muted" id="ntInfo" style="margin-top:8px"></p>
         </div>
       </div>
     </section>
@@ -828,7 +836,7 @@ async function hqLogin(silent){
   loadJournal();
 }
 const hq = (a,p,q) => api(a,Object.assign({pass:hqPass,by:$('hqName').value.trim()},p||{}),q);
-function onHqTab(t){ ({journal:loadJournal,counts:loadCounts,month:loadMonth,reports:loadReports,setting:loadCarry})[t](); }
+function onHqTab(t){ ({journal:loadJournal,counts:loadCounts,month:loadMonth,reports:loadReports,setting:()=>{loadCarry();loadNotify();}})[t](); }
 
 /* 受付・入力 */
 let jRows=[], jGroups=[], grpImgs={}, activeGi=null;
@@ -1082,6 +1090,20 @@ async function loadCarry(){
   const st=await hq('hqStores');
   $('carryBox').innerHTML=`<div class="tw"><table><thead><tr><th>事業所</th><th>繰越日</th><th>繰越残高（円）</th><th></th></tr></thead><tbody>`+
     st.map((s,i)=>`<tr><td>${esc(s.店舗)}</td><td><input type="date" id="cd${i}" value="${esc(s.繰越日)}"></td><td><input id="ca${i}" inputmode="numeric" value="${esc(s.繰越残高)}" style="text-align:right"></td><td><button class="btn sm" onclick="saveCarry('${esc(s.店舗)}',${i})">保存</button></td></tr>`).join('')+'</tbody></table></div>';
+}
+/* 定時通知 */
+async function loadNotify(){
+  const n=await hq('hqNotifyGet');
+  $('ntHour').innerHTML='<option value="">通知しない</option>'+Array.from({length:24},(_,h)=>`<option value="${h}">${h}:00 ごろ</option>`).join('');
+  $('ntHour').value=String(n.hour);
+  $('ntInfo').textContent='送信先：'+([n.line?'LINE WORKS':'',n.mail?'メール（'+n.mail+'）':''].filter(String).join('＋')||'未設定（スクリプトプロパティで LINE WORKS か NOTIFY_EMAIL を設定）')+(n.last?'／前回集計 '+n.last.slice(5,16):'');
+}
+async function saveNotify(){
+  const n=await hq('hqNotifySet',{hour:$('ntHour').value});
+  toast(n.hour===''?'定時通知を停止しました':'毎日 '+n.hour+'時ごろに通知します');
+}
+async function testNotifyHq(){
+  await hq('hqNotifyTest'); toast('テスト通知を送信しました（集計時刻は進めません）');
 }
 async function saveCarry(s,i){
   if(!$('cd'+i).value) return toast('繰越日を入力してください');
