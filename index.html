@@ -175,8 +175,8 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
           <div class="box cnt f-cnt">
             <b>現金有高表</b>
             <div class="radio f-money" id="cntChoice">
-              <label><input type="radio" name="cntMode" value="now" checked> 本日これが最後の取引 → いまの有高表を添付する</label>
-              <label><input type="radio" name="cntMode" value="later"> このあとも本日取引がある（有高表は最後の取引で添付）</label>
+              <label><input type="radio" name="cntMode" value="now" checked> 有高表もいっしょに送る</label>
+              <label><input type="radio" name="cntMode" value="later"> 今回は有高表を送らない</label>
             </div>
             <div id="cntFields">
               <div class="row f-cntonly">
@@ -265,7 +265,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
             <div style="align-self:flex-end"><button class="btn" onclick="loadJournal()">表示</button></div>
           </div>
           <div id="journalBox" style="margin-top:10px"></div>
-          <button class="btn big hide" id="journalSave" onclick="saveJournal()">チェックした取引をすべて「本社処理済」にして、入力した元帳残高を返信</button>
+          <button class="btn big hide" id="journalSave" onclick="saveJournal()">まとめて処理済にして返信（表示中の全グループ）</button>
         </div>
 
         <div id="h-counts" class="card hide">
@@ -644,12 +644,12 @@ async function submitPost(){
   toast(msg,3500);
   const last=cnt?cnt.total:null;
   resetPost(); refreshAlerts();
-  if(last!=null) limitNotice(last,true);
+
 }
 function limitNotice(total,pop){
   let h='';
-  if(total>M.limitMax) h=`<div class="notice red">⚠ 現在有高 ${yen(total)} が上限 ${yen(M.limitMax)} を超えています。<b>本日中に本社へ連絡し、残高調整（返納）</b>を行ってください（原則1）。</div>`;
-  else if(total<M.limitRefill) h=`<div class="notice">現在有高 ${yen(total)} が ${yen(M.limitRefill)} を下回っています。<b>補充を申請</b>してください（原則2：立替禁止）。 <button class="btn sm warn" onclick="goRefill(${total})">補充申請へ</button></div>`;
+  if(total>M.limitMax) h=`<div class="notice">💡 現在有高 ${yen(total)} が目安の ${yen(M.limitMax)} を超えています。機会があれば本社への返納をご検討ください。</div>`;
+  else if(total<M.limitRefill) h=`<div class="notice">現在有高 ${yen(total)} が ${yen(M.limitRefill)} を下回っています。必要に応じて<b>補充を申請</b>してください（立替はしないでください）。 <button class="btn sm warn" onclick="goRefill(${total})">補充申請へ</button></div>`;
   if(pop && h){ $('modalBody').innerHTML=h; $('modal').style.display='flex'; }
   return h;
 }
@@ -677,9 +677,6 @@ async function refreshAlerts(){
     const r=await api('storeMonth',{store:store(),month:today().slice(0,7)},true);
     window._sm=r; let h='';
     if(r.returned.length){ window._ret=r.returned; h+=`<div class="notice red">⚠ 本社から<b>差戻し ${r.returned.length}件</b>：<br>`+r.returned.map((o,i)=>`${esc(o.日付)} ${esc(o.区分)} ${esc(o.相手先||o.摘要)} ${yen(o.金額)}「${esc(o.本社メモ)}」 <button class="btn sm warn" onclick="editEntry(window._ret[${i}])">修正</button>`).join('<br>')+'</div>'; }
-    const past=r.pendingCountDays.filter(d=>d<today()), tod=r.pendingCountDays.includes(today());
-    if(past.length) h+=`<div class="notice red">⚠ 有高表が未投稿の日があります：${past.map(d=>d.slice(5)).join('、')}　「有高報告」から投稿してください（投稿完了とみなされません）。</div>`;
-    if(tod) h+=`<div class="notice">本日の最後の取引のあと、<b>現金有高表</b>を投稿してください。</div>`;
     const wait=r.reports.filter(x=>x.状態==='承認待ち');
     if(wait.length) h+=`<div class="notice">補充申請が<b>店長の承認待ち</b>です（${wait.length}件）。<span class="link" onclick="openTab('stabs','s-','status',onStoreTab)">今月の状況</span>で承認してください。</div>`;
     const toCf=r.entries.filter(o=>o.状態==='入力済').length;
@@ -723,6 +720,11 @@ async function loadStatus(){
     r.entries.map(o=>{window._ent[o.id]=o; const ed=o.状態==='未処理'||o.状態==='差戻し';
       return `<tr><td class="c">${o.状態==='入力済'?`<input type="checkbox" class="sck" value="${o.id}" style="width:22px;height:22px">`:o.状態==='確認済'?'✔':''}</td><td class="d">${o.日付.slice(5)}</td><td class="c">${typeTxt(o.区分)}</td><td>${esc(o.相手先)} ${esc(o.摘要)}<div class="muted">${esc(o.登録者)}</div></td><td class="n">${yen(o.金額)}</td><td class="c">${imgLink(o.画像ID)}</td><td class="c">${kindBadge(o.状態)}</td><td>${esc(o.本社メモ)}</td>
       <td>${ed?`<button class="btn sm sub" onclick="editEntry(window._ent['${o.id}'])">修正</button> <button class="btn sm danger" onclick="deleteEntry('${o.id}')">取消</button>`:''}</td></tr>`}).join('')+'</table></div>'+(r.entries.some(o=>o.状態==='入力済')?`<button class="btn big ok" onclick="confirmEntries()">チェックした取引を「店舗確認済」にする</button><p class="hint">本社処理済の取引の内容（金額・科目）に相違がなければチェックしてください。相違があれば本社経理担当者へ連絡。</p>`:''):'<p class="muted">この月の取引はありません。（取引がなくても月末実査・締めは必要です）</p>';
+  // 本社からの返信
+  if((r.replies||[]).length){
+    h+=`<h3>本社からの返信（元帳）</h3><div class="tw"><table><tr><th>日付</th><th>元帳残高</th><th>有高</th><th>照合</th><th>元帳</th><th>返信者</th></tr>`+
+      r.replies.map(x=>`<tr><td class="d">${esc(x.日付.slice(5))}<div class="muted">${esc(x.登録日時.slice(5,16))}</div></td><td class="n">${x.元帳残高!==''?yen(x.元帳残高):'-'}</td><td class="n">${x.有高!==''?yen(x.有高):'-'}</td><td>${x.照合?kindBadge(x.照合):'-'}</td><td class="c">${imgLink(x.画像ID)}</td><td>${esc(x.返信者)}</td></tr>`).join('')+'</table></div>';
+  }
   // 有高
   h+=`<h3>有高の報告（${r.counts.length}件）</h3>`;
   h+= r.counts.length?`<div class="tw"><table><tr><th>日付</th><th>種別</th><th>有高</th><th>本社の元帳残高</th><th>有高表</th><th>本社照合</th></tr>`+
@@ -813,33 +815,32 @@ const hq = (a,p,q) => api(a,Object.assign({pass:hqPass,by:$('hqName').value.trim
 function onHqTab(t){ ({journal:loadJournal,counts:loadCounts,month:loadMonth,reports:loadReports,setting:loadCarry})[t](); }
 
 /* 受付・入力 */
-let jRows=[], jGroups=[];
+let jRows=[], jGroups=[], grpImgs={}, activeGi=null;
 async function loadJournal(){
   const jd=$('jDate').value, st=$('jStore').value, month=jd?jd.slice(0,7):$('jMonth').value, status=$('jStatus').value;
-  const [rows,cnts]=await Promise.all([hq('hqList',{store:st,month,status}), hq('hqCounts',{store:st,month},true)]);
+  const [rows,cnts,reps]=await Promise.all([hq('hqList',{store:st,month,status}), hq('hqCounts',{store:st,month},true), hq('hqReplies',{store:st,month},true)]);
   jRows=rows.filter(o=>!jd||o.日付===jd);
   jRows.sort((a,b)=>(a.日付+a.店舗+a.登録日時)<(b.日付+b.店舗+b.登録日時)?-1:1);
-  // 事業所×日 でまとめる
-  const g={};
-  const key=(d,s)=>d+'|'+s;
-  jRows.forEach((o,i)=>{ const k=key(o.日付,o.店舗); (g[k]=g[k]||{date:o.日付,store:o.店舗,idx:[],counts:[]}).idx.push(i); });
+  const g={}, key=(d,s)=>d+'|'+s;
+  jRows.forEach((o,i)=>{ const k=key(o.日付,o.店舗); (g[k]=g[k]||{date:o.日付,store:o.店舗,idx:[],counts:[],replies:[]}).idx.push(i); });
   const cs=cnts.filter(c=>!jd||c.日付===jd);
-  // 取引のない日でも、未照合の有高がある日（「すべて」なら全部）は表示
-  cs.forEach(c=>{ const k=key(c.日付,c.店舗); if(!g[k] && (status==='すべて'||(status==='未処理'&&!c.照合))) g[k]={date:c.日付,store:c.店舗,idx:[],counts:[]}; });
+  cs.forEach(c=>{ const k=key(c.日付,c.店舗); if(!g[k] && (status==='すべて'||(status==='未処理'&&!c.照合))) g[k]={date:c.日付,store:c.店舗,idx:[],counts:[],replies:[]}; });
   cs.forEach(c=>{ const k=key(c.日付,c.店舗); if(g[k]) g[k].counts.push(c); });
+  reps.forEach(x=>{ const k=key(x.日付,x.店舗); if(g[k]) g[k].replies.push(x); });
   jGroups=Object.values(g).sort((a,b)=>(a.date+a.store)<(b.date+b.store)?-1:1);
+  grpImgs={}; activeGi=null;
   const ac=M.accounts;
   const opt=(t,cur)=>{ const k=IN[t]?'収受':'支払';
     return '<option value="">（未選択）</option>'+ac.filter(a=>a.kind===k||a.kind==='共通'||!a.kind).map(a=>`<option ${a.name===cur?'selected':''}>${esc(a.name)}</option>`).join('')+(cur&&!ac.some(a=>a.name===cur)?`<option selected>${esc(cur)}</option>`:''); };
-  let h=`<p class="muted">${jGroups.length}グループ（取引 ${jRows.length}件）　※科目・金額を変えるとチェックが入ります。</p>`;
+  let h=`<p class="muted">${jGroups.length}グループ（取引 ${jRows.length}件）　※未処理の取引は最初からチェック済み。返却しないものだけチェックを外してください。元帳のスクショは「📎元帳を添付」か、グループをクリックしてから <b>Ctrl+V</b> で貼り付け。</p>`;
   if(!jGroups.length) h+='<p class="muted">該当なし</p>';
   jGroups.forEach((G,gi)=>{
     const c=G.counts.sort((a,b)=>(b.登録日時)<(a.登録日時)?-1:1)[0]; G.latest=c;
-    h+=`<div class="grp"><div class="grph"><span>📅 ${esc(G.date)}</span><span>🏪 ${esc(G.store)}</span><span style="font-weight:normal">取引 ${G.idx.length}件</span></div>`;
+    h+=`<div class="grp" id="grp${gi}" onclick="activeGi=${gi};document.querySelectorAll('.grp').forEach(e=>e.style.outline='');this.style.outline='2px solid var(--blue)'"><div class="grph"><span>📅 ${esc(G.date)}</span><span>🏪 ${esc(G.store)}</span><span style="font-weight:normal">取引 ${G.idx.length}件</span>${G.replies.length?`<span style="font-weight:normal">｜返信済 ${G.replies.map(r=>`${esc(r.登録日時.slice(11,16))}${r.元帳残高!==''?' 元帳'+yen(r.元帳残高):''} ${imgLink(r.画像ID)}`).join('、')}</span>`:''}</div>`;
     if(G.idx.length){
-      h+=`<div class="tw"><table><thead><tr><th><input type="checkbox" style="width:auto" onclick="document.querySelectorAll('.jk[data-g=\'${gi}\']').forEach(x=>x.checked=this.checked)"></th><th>区分</th><th>相手先</th><th>内容</th><th>金額</th><th>証憑</th><th>勘定科目</th><th>補助</th><th>本社メモ</th><th>状態</th><th></th></tr></thead><tbody>`;
-      G.idx.forEach(i=>{ const o=jRows[i];
-        h+=`<tr><td class="c"><input type="checkbox" class="jk" data-i="${i}" data-g="${gi}" style="width:auto"></td><td class="c">${typeTxt(o.区分)}</td>
+      h+=`<div class="tw"><table><thead><tr><th><input type="checkbox" style="width:auto" checked onclick="document.querySelectorAll('.jk[data-g=\'${gi}\']').forEach(x=>x.checked=this.checked)"></th><th>区分</th><th>相手先</th><th>内容</th><th>金額</th><th>証憑</th><th>勘定科目</th><th>補助</th><th>本社メモ</th><th>状態</th><th></th></tr></thead><tbody>`;
+      G.idx.forEach(i=>{ const o=jRows[i], open=o.状態==='未処理'||o.状態==='差戻し';
+        h+=`<tr><td class="c"><input type="checkbox" class="jk" data-i="${i}" data-g="${gi}" style="width:auto" ${open?'checked':''}></td><td class="c">${typeTxt(o.区分)}</td>
         <td>${esc(o.相手先)}</td><td>${esc(o.摘要)}<div class="muted">${esc(o.登録者)} ${esc(o.登録日時.slice(11,16))}</div></td>
         <td><input class="s" id="ja${i}" value="${o.金額}" style="width:86px;text-align:right" onchange="chk(${i})"></td><td class="c">${imgLink(o.画像ID)}</td>
         <td><select class="acct" id="jc${i}" onchange="chk(${i})">${opt(o.区分,o.勘定科目)}</select></td>
@@ -848,46 +849,48 @@ async function loadJournal(){
         <td class="c">${kindBadge(o.状態)}</td><td><button class="btn sm danger" onclick="returnEntry(${i})">差戻し</button></td></tr>`; });
       h+='</tbody></table></div>';
     }
-    // 有高 ⇔ 元帳残高
-    if(c){
-      const bk=c.照合時帳簿!==''&&c.照合時帳簿!=null?Number(c.照合時帳簿):null, df=bk==null?null:c.合計-bk;
-      const older=G.counts.slice(1);
-      h+=`<div class="grpc">
-        <div class="blk">店舗の有高（${esc(c.登録日時.slice(11,16))}・${esc(c.種別)}）<br><b style="font-size:18px">${yen(c.合計)}</b> ${imgLink(c.画像ID)}${older.length?`<div class="muted">同日の古い有高 ${older.map(x=>`${esc(x.登録日時.slice(11,16))} ${yen(x.合計)} ${imgLink(x.画像ID)}`).join('、')}</div>`:''}</div>
-        <div class="blk">奉行の元帳残高<br><input class="s lb" data-g="${gi}" id="lb${gi}" inputmode="numeric" value="${bk==null?'':bk.toLocaleString()}" placeholder="例 27,500" style="width:130px;text-align:right;font-size:16px" oninput="lbDiff(${gi},${c.合計})"></div>
-        <div class="blk">差異<br><span id="ld${gi}" style="font-size:16px">${df==null?'-':df===0?'<span class="ok">一致</span>':`<span class="ng">${yen(df)}</span>`}</span></div>
-        <div class="blk">照合<br>${c.照合?kindBadge(c.照合)+' <span class="muted">'+esc(c.照合者)+'</span>':kindBadge('照合待ち')}</div>
-        <div class="blk" style="flex:1;text-align:right"><button class="btn ok" onclick="processGroup(${gi})">${G.idx.length?'✔ 処理済にして有高を返信':'✔ 有高の照合を返信'}</button><br><span class="link" style="font-size:12px" onclick="pastCounts('${esc(G.store)}')">この事業所の過去の有高</span></div>
-      </div>`;
-    } else {
-      h+=`<div class="grpc"><span class="ng">⚠ この日の有高表がまだ投稿されていません</span><div style="flex:1;text-align:right">${G.idx.length?`<button class="btn" onclick="processGroup(${gi})">✔ 処理済にする</button>`:''}</div></div>`;
-    }
-    h+='</div>';
+    const bk=c&&c.照合時帳簿!==''&&c.照合時帳簿!=null?Number(c.照合時帳簿):null, df=bk==null?null:c.合計-bk;
+    const older=c?G.counts.slice(1):[];
+    h+=`<div class="grpc">
+      <div class="blk">${c?`店舗の有高（${esc(c.登録日時.slice(11,16))}）<br><b style="font-size:18px">${yen(c.合計)}</b> ${imgLink(c.画像ID)}${older.length?`<div class="muted">古い有高 ${older.map(x=>`${esc(x.登録日時.slice(11,16))} ${yen(x.合計)}`).join('、')}</div>`:''}`:'<span class="muted">有高表の投稿なし</span>'}</div>
+      <div class="blk">奉行の元帳残高<br><input class="s lb" id="lb${gi}" inputmode="numeric" value="${bk==null?'':bk.toLocaleString()}" placeholder="例 27,500" style="width:130px;text-align:right;font-size:16px" ${c?`oninput="lbDiff(${gi},${c.合計})"`:''}></div>
+      <div class="blk">差異<br><span id="ld${gi}" style="font-size:16px">${!c?'-':df==null?'-':df===0?'<span class="ok">一致</span>':`<span class="ng">${yen(df)}</span>`}</span></div>
+      <div class="blk">元帳（スクショ）<br><label class="btn sm sub" style="cursor:pointer">📎元帳を添付<input type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="addGrpImg(${gi},this)"></label><div class="thumbs" id="gt${gi}"></div></div>
+      <div class="blk" style="flex:1;text-align:right"><button class="btn ok" onclick="processGroup(${gi})">✔ 処理済にして返信</button>${c?`<br><span class="link" style="font-size:12px" onclick="pastCounts('${esc(G.store)}')">この事業所の過去の有高</span>`:''}</div>
+    </div></div>`;
   });
   $('journalBox').innerHTML=h; $('journalSave').classList.toggle('hide',!jGroups.length);
 }
+async function addGrpImg(gi,inp){ const files=[...inp.files]; inp.value=''; for(const f of files){ try{ (grpImgs[gi]=grpImgs[gi]||[]).push(await compress(f,2000,0.85)); }catch(e){ toast(e.message); } } drawGrpImgs(gi); }
+function drawGrpImgs(gi){ $('gt'+gi).innerHTML=(grpImgs[gi]||[]).map((d,i)=>`<div>${d.startsWith('data:application/pdf')?'<div class="pdf">PDF</div>':`<img src="${d}">`}<span class="x" onclick="event.stopPropagation();grpImgs[${gi}].splice(${i},1);drawGrpImgs(${gi})">×</span></div>`).join(''); }
+// グループをクリックしてから Ctrl+V でスクショ貼り付け
+document.addEventListener('paste',async e=>{
+  if(activeGi==null || $('hqBody').classList.contains('hide')) return;
+  const items=[...(e.clipboardData||{}).items||[]].filter(x=>x.type.startsWith('image/')); if(!items.length) return;
+  e.preventDefault();
+  for(const it of items){ const f=it.getAsFile(); if(f) (grpImgs[activeGi]=grpImgs[activeGi]||[]).push(await compress(f,2000,0.85)); }
+  drawGrpImgs(activeGi); toast('元帳を貼り付けました');
+});
 function lbDiff(gi,total){ const v=$('lb'+gi).value.trim(); const el=$('ld'+gi); if(v===''){el.textContent='-';return;} const d=total-num(v); el.innerHTML=d===0?'<span class="ok">一致</span>':`<span class="ng">${yen(d)}</span>`; }
-async function saveLedgerBal(gi,quiet){
-  const c=jGroups[gi]&&jGroups[gi].latest; const el=$('lb'+gi); if(!c||!el) return false;
-  const v=el.value.trim(); if(v===''){ if(!quiet) toast('元帳残高を入力してください'); return false; }
-  const book=num(v), d=c.合計-book;
-  if(c.照合 && String(book)===String(c.照合時帳簿)) return false;
-  await hq('hqCheckCount',{id:c.id,result:d===0?'一致':'差異',book,hqMemo:d===0?'':`元帳残高 ${yen(book)}／有高 ${yen(c.合計)}／差異 ${yen(d)}　ご確認ください`},true);
-  return true;
-}
 const itemOf=i=>({id:jRows[i].id,account:$('jc'+i).value,sub:$('js'+i).value.trim(),hqMemo:$('jm'+i).value.trim(),amount:num($('ja'+i).value)});
+// 1グループ分：チェックした取引を処理済 → 元帳残高・スクショを返信
+async function sendGroup(gi){
+  const G=jGroups[gi];
+  const idx=[...document.querySelectorAll(`.jk[data-g="${gi}"]:checked`)].map(c=>+c.dataset.i);
+  const v=$('lb'+gi).value.trim(), imgs=grpImgs[gi]||[];
+  let n=0, sent=false;
+  if(idx.length){ const r=await hq('hqJournal',{items:idx.map(itemOf)},true); n=r.updated; }
+  if(v!==''||imgs.length){
+    const c=G.latest, same=c&&c.照合&&String(num(v))===String(c.照合時帳簿)&&!imgs.length;
+    if(!same){ await hq('hqReply',{store:G.store,date:G.date,countId:c?c.id:'',book:v===''?'':num(v),images:imgs},true); sent=true; }
+  }
+  return {n,sent};
+}
 async function processGroup(gi){
   const G=jGroups[gi];
-  let idx=[...document.querySelectorAll(`.jk[data-g="${gi}"]:checked`)].map(c=>+c.dataset.i);
-  const open=G.idx.filter(i=>jRows[i].状態==='未処理'||jRows[i].状態==='差戻し');
-  if(!idx.length && open.length){ if(!confirm(`チェックがありません。この事業所・日の未処理 ${open.length}件をすべて処理済にしますか？`)) return; idx=open; }
-  if(G.latest && $('lb'+gi).value.trim()==='' && !confirm('元帳残高が未入力です。取引の処理だけ行いますか？')) return;
   busy(true);
-  try{
-    let n=0; if(idx.length){ const r=await hq('hqJournal',{items:idx.map(itemOf)},true); n=r.updated; }
-    const sent=G.latest?await saveLedgerBal(gi,true):false;
-    toast(`${G.store} ${G.date.slice(5)}：${n}件を処理済${sent?'・有高の照合を返信':''}しました`);
-  }finally{ busy(false); }
+  try{ const r=await sendGroup(gi); toast(`${G.store} ${G.date.slice(5)}：${r.n}件を処理済${r.sent?'・返信':''}しました`); }
+  finally{ busy(false); }
   loadJournal();
 }
 function pastCounts(s){
@@ -899,15 +902,10 @@ function pastCounts(s){
 }
 function chk(i){ document.querySelector(`.jk[data-i="${i}"]`).checked=true; }
 async function saveJournal(){
-  const idx=[...document.querySelectorAll('.jk:checked')].map(c=>+c.dataset.i);
-  const gis=jGroups.map((G,gi)=>gi).filter(gi=>$('lb'+gi)&&$('lb'+gi).value.trim()!=='');
-  if(!idx.length && !gis.length) return toast('取引にチェックするか、元帳残高を入力してください');
-  busy(true);
-  try{
-    let n=0; if(idx.length){ const r=await hq('hqJournal',{items:idx.map(itemOf)},true); n=r.updated; }
-    let m=0; for(const gi of gis){ if(await saveLedgerBal(gi,true)) m++; }
-    toast(`${n}件を本社処理済にしました`+(m?`（有高の照合 ${m}件を返信）`:''));
-  }finally{ busy(false); }
+  if(!confirm('表示中のすべてのグループを、チェックした取引で「処理済」にして返信します。よろしいですか？')) return;
+  busy(true); let n=0, m=0;
+  try{ for(let gi=0;gi<jGroups.length;gi++){ const r=await sendGroup(gi); n+=r.n; if(r.sent) m++; } toast(`${n}件を処理済にしました（返信 ${m}件）`); }
+  finally{ busy(false); }
   loadJournal();
 }
 async function returnEntry(i){
@@ -955,7 +953,7 @@ async function loadMonth(){
     <td class="n">${me?yen(me.total)+' '+imgLink(me.images):'<span class="muted">未報告</span>'}</td>
     <td class="n">${diff==null?'-':diff===0?'<span class="ok">一致</span>':`<span class="ng">${yen(diff)}</span>`}</td>
     <td>${r.status.未処理?`<span class="ng">未処理${r.status.未処理}</span> `:''}${r.status.差戻し?`差戻${r.status.差戻し} `:''}<span class="muted">入力済${r.status.入力済} 確認済${r.status.確認済}</span></td>
-    <td>${r.pendingCountDays?`<span class="ng">未投稿${r.pendingCountDays}日</span> `:''}${r.openCounts?`未照合${r.openCounts} `:''}${r.diffCounts?`<span class="ng">差異${r.diffCounts}</span>`:''}</td>
+    <td>${r.openCounts?`未照合${r.openCounts} `:''}${r.diffCounts?`<span class="ng">差異${r.diffCounts}</span>`:''}</td>
     <td class="c">${m.締め日時?kindBadge('済'):kindBadge('未')}</td>
     <td class="c">${m.開示日時?kindBadge('済')+`<div class="muted">${esc(m.開示日時.slice(5,10))}</div>`:`<button class="btn sm" ${me?'':'disabled title="月末実査の報告後に開示できます"'} onclick="disclose(${i})">開示</button>`}</td>
     <td class="c">${m.元帳確認日時?kindBadge('済'):m.開示日時?kindBadge('確認待ち'):'-'}</td>
