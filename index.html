@@ -151,7 +151,8 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
       <div id="s-post" class="card">
         <h2 id="postTitle">投稿</h2>
         <div id="editInfo" class="notice red hide"></div>
-        <label class="f">区分</label>
+        <div id="queueBox" class="qbox hide"></div>
+        <label class="f" id="kindsLabel">区分</label>
         <div class="kinds" id="kinds">
           <button data-k="支払" class="k-out">支払</button>
           <button data-k="収受" class="k-in">収受</button>
@@ -164,16 +165,6 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
         <div id="kindHint" class="hint"></div>
 
         <div id="postBody" class="hide">
-          <div id="queueBox" class="qbox hide"></div>
-          <div id="itemKindWrap" class="hide" style="margin-bottom:8px">
-            <label class="f">次の1件の区分（支払・収受などを切り替えて追加できます）</label>
-            <div class="kinds" id="itemKinds">
-              <button data-k="支払" class="k-out">支払</button>
-              <button data-k="収受" class="k-in">収受</button>
-              <button data-k="返納" class="k-out">返納</button>
-              <button data-k="補充受領" class="k-in">補充受領</button>
-            </div>
-          </div>
           <div class="row">
             <div><label class="f">日付</label><input type="date" id="pDate"></div>
             <div class="f-money"><label class="f">金額（円）</label><input id="pAmount" inputmode="numeric" placeholder="1,980"></div>
@@ -409,7 +400,7 @@ async function start(){
   const m = today().slice(0,7);
   ['sMonth','lMonth','jMonth','cMonth','mMonth'].forEach(id=>$(id).value=m); $('pDate').value=today();
   setupTabs('stabs','s-',onStoreTab); setupTabs('htabs','h-',onHqTab);
-  document.querySelectorAll('#kinds button,#itemKinds button').forEach(b=>b.onclick=()=>selectKind(b.dataset.k));
+  document.querySelectorAll('#kinds button').forEach(b=>b.onclick=()=>selectKind(b.dataset.k));
   document.querySelectorAll('input[name=cntMode]').forEach(r=>r.onchange=paintKind);
   $('pDate').addEventListener('input',()=>{dateTouched=true;}); ['pDate','pAmount','pPartner','pMemo','cTotal'].forEach(id=>$(id).addEventListener('input',()=>$(id).classList.remove('auto')));
   $('fEv').onchange=e=>addFiles(e,'ev'); $('fCnt').onchange=e=>addFiles(e,'cnt'); $('fEvCam').onchange=e=>addFiles(e,'ev'); $('fCntCam').onchange=e=>addFiles(e,'cnt');
@@ -609,7 +600,7 @@ function selectKind(k){
   if(editing && !['支払','収受','返納','補充受領'].includes(k)) return toast('修正中は区分を取引から変えられません');
   if(queue.length && !['支払','収受','返納','補充受領'].includes(k)) return toast(`追加した ${queue.length}件を先に投稿してください`);
   kind=k;
-  document.querySelectorAll('#kinds button,#itemKinds button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  document.querySelectorAll('#kinds button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
   $('kindHint').textContent=HINTS[k]||'';
   $('postBody').classList.remove('hide');
   if(k==='有高' && !editing) $('cKind').value = isMonthEndToday() ? '月末実査' : $('cKind').value;
@@ -637,7 +628,7 @@ function paintKind(){
   const labels={'支払':'支払を投稿','収受':'収受を投稿','返納':'返納を投稿','補充受領':'補充受領を投稿','有高':'有高を報告','補充申請':'補充を申請','差異報告':'差異を報告'};
   $('pSubmit').textContent = editing?'修正して再送':queue.length&&money?`まとめて投稿する（追加 ${queue.length}件＋入力中の分）`:labels[kind]||'投稿する';
   $('pAdd').classList.toggle('hide',!money||!!editing);
-  $('itemKindWrap').classList.toggle('hide',!money||!!editing||!queue.length);
+  $('kindsLabel').textContent = queue.length&&money ? `次の1件（${queue.length+1}件目）の区分　※支払・収受などを切り替えて追加できます` : '区分';
   const sh=shareTxt(store());
   $('shareNote').classList.toggle('hide',!sh);
   $('shareNote').textContent = sh ? `※ 現金は ${sh} で共有しています。有高表は ${M.shares[store()]||store()} の有高として本社に届きます。` : '';
@@ -729,7 +720,7 @@ function queueAdd(){
   const p=readMoney(); if(!p) return;
   queue.push(p); clearMoneyForm(); drawQueue(); paintKind();
   toast(`${queue.length}件目を追加しました。次の1件の区分（支払・収受など）を選んで入力してください`,3500);
-  $('queueBox').scrollIntoView({behavior:'smooth',block:'start'});
+  $('s-post').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function drawQueue(){
   const b=$('queueBox'); if(!b) return;
