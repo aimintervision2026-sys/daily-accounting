@@ -477,7 +477,7 @@ async function showImages(ids){
   let h='';
   for(const id of list){
     try{ const r=await api('image',{id},true);
-      h+= r.dataUrl.startsWith('data:application/pdf') ? `<p><a download="${esc(r.name)}" href="${r.dataUrl}">📄 ${esc(r.name)}</a></p>` : `<img src="${r.dataUrl}" alt="${esc(r.name)}"><p class="muted" style="text-align:center">${esc(r.name)}</p>`;
+      h+= r.dataUrl.startsWith('data:application/pdf') ? `<p><a download="${esc(r.name)}" href="${r.dataUrl}">📄 ${esc(r.name)}</a></p>` : `<img src="${r.dataUrl}" alt="${esc(r.name)}"><p class="muted" style="text-align:center">${esc(r.name)}　<a class="btn sm sub" style="text-decoration:none" download="${esc(r.name)}" href="${r.dataUrl}">⬇ ダウンロード</a></p>`;
     }catch(e){ h+='<p class="ng">画像を取得できませんでした</p>'; }
     $('modalBody').innerHTML=h;
   }
