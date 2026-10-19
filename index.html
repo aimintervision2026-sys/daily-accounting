@@ -104,6 +104,13 @@ tr.cnt.ng td{background:#fff0f0}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:97;padding:12px}
 .modal .box2{background:#fff;border-radius:10px;max-width:1100px;width:100%;max-height:92vh;overflow:auto;padding:14px}
 .modal img{max-width:100%;display:block;margin:6px auto}
+#pv{position:fixed;top:10px;right:10px;bottom:10px;width:min(40vw,640px);background:#fff;border:1px solid #c3cde0;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:none;flex-direction:column;z-index:60}
+#pv .h{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #e3e8f0;font-weight:bold;color:var(--navy,#1b3a5c)}
+#pv .h span{flex:1;font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#pv .b{flex:1;overflow:auto;padding:8px;background:#f6f8fa}
+#pv .b img{max-width:100%;display:block;margin:0 auto 6px;background:#fff}
+body.pv-on main{max-width:none;margin:0 calc(min(40vw,640px) + 20px) 0 0}
+tr.pv-cur>td,.blk.pv-cur,.qi.pv-cur{background:#fff3c4 !important}
 .hide{display:none!important}
 .link{color:var(--blue);cursor:pointer;text-decoration:underline}
 select.acct{min-width:120px;padding:4px;font-size:13px}
@@ -342,6 +349,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
 
 <div id="toast"></div>
 <div id="loading">処理中…</div>
+<div id="pv"><div class="h">🔍 <span id="pvTitle">証憑プレビュー</span><button class="btn sm sub" onclick="closePv()">× 閉じる</button></div><div class="b" id="pvBody"></div></div>
 <div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="box2"><div style="text-align:right"><button class="btn sm sub" onclick="closeModal()">閉じる</button></div><div id="modalBody"></div></div></div>
 
 <script>
@@ -483,7 +491,36 @@ async function showImages(ids){
   }
 }
 function closeModal(){ $('modal').style.display='none'; }
-const imgLink = ids => ids ? `<span class="link" onclick="showImages('${esc(ids)}')">📎${ids.split(',').length}</span>` : '<span class="muted">なし</span>';
+/* ===== カーソルを合わせた行の証憑を右側に表示（PCのみ） ===== */
+const canHover=matchMedia('(hover:hover) and (pointer:fine)').matches;
+const imgCache={};
+function getImg(id){ if(!imgCache[id]) imgCache[id]=api('image',{id},true).catch(e=>{ delete imgCache[id]; throw e; }); return imgCache[id]; }
+let pvIds='', pvTimer=null, pvHost=null;
+document.addEventListener('mouseover',e=>{
+  if(!canHover || innerWidth<900 || !e.target.closest) return;
+  if(e.target.closest('#pv,.modal')) return;
+  const host=e.target.closest('tr,.blk,.qi'); if(!host) return;
+  const l=host.querySelector('[data-ids]'); if(!l || l.dataset.ids===pvIds) return;
+  clearTimeout(pvTimer); pvTimer=setTimeout(()=>showPv(l.dataset.ids,host),150);
+});
+async function showPv(ids,host){
+  pvIds=ids;
+  if(pvHost) pvHost.classList.remove('pv-cur'); pvHost=host; host.classList.add('pv-cur');
+  const t=(host.tagName==='TR'?[...host.children].map(td=>td.querySelector('select,input,button')?'':td.innerText).join(' '):host.innerText||'').replace(/📎\d+/g,'').replace(/\s+/g,' ').trim().slice(0,60);
+  $('pvTitle').textContent=t||'証憑プレビュー';
+  $('pv').style.display='flex'; document.body.classList.add('pv-on');
+  const list=ids.split(',').filter(Boolean);
+  $('pvBody').innerHTML='<p class="muted">読込中…</p>';
+  let h='';
+  for(const id of list){
+    try{ const r=await getImg(id); if(pvIds!==ids) return;
+      h+= r.dataUrl.startsWith('data:application/pdf') ? `<p><a download="${esc(r.name)}" href="${r.dataUrl}">📄 ${esc(r.name)}（PDF）</a></p>` : `<img src="${r.dataUrl}" alt="${esc(r.name)}">`;
+    }catch(e){ if(pvIds!==ids) return; h+='<p class="ng">画像を取得できませんでした</p>'; }
+    $('pvBody').innerHTML=h;
+  }
+}
+function closePv(){ $('pv').style.display='none'; document.body.classList.remove('pv-on'); pvIds=''; if(pvHost) pvHost.classList.remove('pv-cur'); pvHost=null; }
+const imgLink = ids => ids ? `<span class="link" data-ids="${esc(ids)}" onclick="showImages('${esc(ids)}')">📎${ids.split(',').length}</span>` : '<span class="muted">なし</span>';
 
 /* ===== OCR（写真から日付・金額・支払先を読み取り） ===== */
 let dateTouched=false, lastOcrText='';
