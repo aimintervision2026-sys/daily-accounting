@@ -495,13 +495,33 @@ function closeModal(){ $('modal').style.display='none'; }
 const canHover=matchMedia('(hover:hover) and (pointer:fine)').matches;
 const imgCache={};
 function getImg(id){ if(!imgCache[id]) imgCache[id]=api('image',{id},true).catch(e=>{ delete imgCache[id]; throw e; }); return imgCache[id]; }
+// 画面に出た証憑を裏で先読み（4枚ずつ・2本並行）。カーソルを合わせたときにすぐ出るように
+let pfQueue=[], pfRunning=0, pfTimer=null;
+function prefetchVisible(){
+  if(!canHover || innerWidth<900) return;
+  const ids=[];
+  document.querySelectorAll('[data-ids]').forEach(el=>{ if(el.offsetParent) el.dataset.ids.split(',').forEach(id=>{ if(id && !imgCache[id] && !ids.includes(id)) ids.push(id); }); });
+  pfQueue=ids; for(let i=pfRunning;i<2;i++) pfNext();
+}
+async function pfNext(){
+  const batch=[]; while(pfQueue.length && batch.length<4){ const id=pfQueue.shift(); if(!imgCache[id]) batch.push(id); }
+  if(!batch.length) return;
+  pfRunning++;
+  const res={}; batch.forEach(id=>{ imgCache[id]=new Promise((ok,ng)=>res[id]={ok,ng}); imgCache[id].catch(()=>{}); });
+  try{
+    const list=await api('images',{ids:batch},true);
+    batch.forEach(id=>{ const r=list.find(x=>x.id===id); if(r&&r.dataUrl) res[id].ok(r); else { delete imgCache[id]; res[id].ng(new Error('取得失敗')); } });
+  }catch(e){ batch.forEach(id=>{ delete imgCache[id]; res[id].ng(e); }); }
+  pfRunning--; pfNext();
+}
+new MutationObserver(()=>{ clearTimeout(pfTimer); pfTimer=setTimeout(prefetchVisible,400); }).observe(document.body,{childList:true,subtree:true});
 let pvIds='', pvTimer=null, pvHost=null;
 document.addEventListener('mouseover',e=>{
   if(!canHover || innerWidth<900 || !e.target.closest) return;
   if(e.target.closest('#pv,.modal')) return;
   const host=e.target.closest('tr,.blk,.qi'); if(!host) return;
   const l=host.querySelector('[data-ids]'); if(!l || l.dataset.ids===pvIds) return;
-  clearTimeout(pvTimer); pvTimer=setTimeout(()=>showPv(l.dataset.ids,host),150);
+  clearTimeout(pvTimer); pvTimer=setTimeout(()=>showPv(l.dataset.ids,host),80);
 });
 async function showPv(ids,host){
   pvIds=ids;
