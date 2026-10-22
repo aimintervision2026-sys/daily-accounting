@@ -287,6 +287,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
           <div class="box noprint" style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
             <div style="flex:1;min-width:240px"><b>📦 証憑の保存（共有フォルダ用）</b><div class="hint" id="zipInfo">読み込み中…</div></div>
             <button class="btn" onclick="downloadNew()">未保存分をZIPでダウンロード</button>
+            <button class="btn sub" onclick="markZipSaved()" title="ダウンロードせずに、今までの分をすべて保存済みにします">すべて保存済みにする</button>
           </div>
           <div id="journalBox" style="margin-top:10px"></div>
           <button class="btn big ok hide" id="journalSave" onclick="saveJournal()">✔ 処理済にして店舗へ返信（チェックした取引・元帳残高・元帳スクショ）</button>
@@ -1006,7 +1007,7 @@ async function loadJournal(){
       <div class="blk">奉行の元帳残高${shG&&c?`<span class="muted">（${esc(shG)} 合算）</span>`:''}<br><input class="s lb" id="lb${gi}" inputmode="numeric" value="${bk==null?'':bk.toLocaleString()}" placeholder="例 27,500" style="width:130px;text-align:right;font-size:16px" ${c?`oninput="lbDiff(${gi},${c.合計})"`:''}></div>
       <div class="blk">差異<br><span id="ld${gi}" style="font-size:16px">${!c?'-':df==null?'-':df===0?'<span class="ok">一致</span>':`<span class="ng">${yen(df)}</span>`}</span></div>
       <div class="blk">元帳（スクショ）<br><label class="btn sm sub" style="cursor:pointer">📎元帳を添付<input type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="addGrpImg(${gi},this)"></label><div class="thumbs" id="gt${gi}"></div></div>
-      <div class="blk" style="flex:1;text-align:right">${c?`<span class="link" style="font-size:12px" onclick="pastCounts('${esc(G.store)}')">この事業所の過去の有高</span>`:''}</div>
+      <div class="blk" style="flex:1;text-align:right">${G.counts.some(x=>!x.照合)?`<label style="display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="cc${gi}" style="width:auto" ${G.idx.length?'':'checked'}> 有高を確認済にする<span class="muted">（元帳残高なしでも完了）</span></label><br>`:''}${c?`<button class="btn sm danger" onclick="event.stopPropagation();deleteCount(${gi})">🗑 この有高を削除</button> <span class="link" style="font-size:12px" onclick="pastCounts('${esc(G.store)}')">過去の有高</span>`:''}</div>
     </div></div>`;
   });
   $('journalBox').innerHTML=h; $('journalSave').classList.toggle('hide',!jGroups.length);
@@ -1014,11 +1015,18 @@ async function loadJournal(){
 }
 async function loadZipInfo(){
   try{ const r=await hq('hqZipInfo',{},true);
-    $('zipInfo').innerHTML=`前回保存：${r.last?esc(r.last.slice(5,16)):'まだなし'}　／　<b>未保存 ${r.pending}件</b>　<span class="muted">ZIPを開いて中のフォルダを全部選択→「現金 請求書および領収書」フォルダに貼り付け</span>`;
+    $('zipInfo').innerHTML=`前回保存：${r.last?esc(r.last.slice(5,16)):'まだなし'}　／　<b>未保存 ${r.pending}件</b>　<span class="muted">ZIPを開いて中のフォルダを全部選択→「現金 請求書および領収書」フォルダに貼り付け</span>`+
+      (zipUntil?`<div class="notice" style="margin:6px 0 0">ダウンロード済みで未完了の分があります。共有フォルダへ貼り付けたら → <button class="btn sm ok" onclick="markZipDone()">今回の分を保存済みにする</button></div>`:'');
   }catch(e){ $('zipInfo').textContent=''; }
 }
 function saveB64(b64,name){ const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([u],{type:'application/zip'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},5000); }
+let zipUntil=null;
+async function markZipDone(){ if(!zipUntil) return; await hq('hqZipDone',{until:zipUntil}); zipUntil=null; toast('今回ダウンロードした分を保存済みにしました'); loadZipInfo(); }
+async function markZipSaved(){
+  if(!confirm('今までの証憑をすべて「保存済み」にします（ダウンロードはしません）。\n共有フォルダへの保存が済んでいる場合だけ実行してください。よろしいですか？')) return;
+  await hq('hqZipDone',{}); toast('保存済みにしました'); loadZipInfo();
+}
 async function downloadNew(){
   busy(true);
   try{
@@ -1030,8 +1038,8 @@ async function downloadNew(){
       saveB64(r.data,r.name); await new Promise(res=>setTimeout(res,700)); part++;
     }while(part<parts);
     if(confirm(`ZIP ${parts}個（画像 ${n}枚）をダウンロードしました。\n共有フォルダへの保存が済んだら「OK」を押してください（次回からは今回より後の分だけになります）。\n※うまく保存できなかった場合は「キャンセル」→もう一度ダウンロードできます。`)){
-      await hq('hqZipDone',{until},true); toast('保存済みにしました');
-    }
+      await hq('hqZipDone',{until},true); toast('保存済みにしました'); zipUntil=null;
+    } else zipUntil=until; // あとから「今回の分を保存済みにする」で完了できる
   }catch(e){ toast('作成できませんでした：'+(e.message||e),4000); }
   finally{ busy(false); loadZipInfo(); }
 }
@@ -1054,11 +1062,25 @@ async function sendGroup(gi){
   const v=$('lb'+gi).value.trim(), imgs=grpImgs[gi]||[];
   let n=0, sent=false;
   if(idx.length){ const r=await hq('hqJournal',{items:idx.map(itemOf)},true); n=r.updated; }
+  const c=G.latest;
   if(v!==''||imgs.length){
-    const c=G.latest, same=c&&c.照合&&String(num(v))===String(c.照合時帳簿)&&!imgs.length;
+    const same=c&&c.照合&&String(num(v))===String(c.照合時帳簿)&&!imgs.length;
     if(!same){ await hq('hqReply',{store:G.store,date:G.date,countId:c?c.id:'',book:v===''?'':num(v),images:imgs},true); sent=true; }
   }
+  // 有高だけの投稿など：チェックがあれば残っている有高を「確認済」にして一覧から消す
+  const cc=$('cc'+gi);
+  if(cc && (cc.checked || v!=='')){
+    for(const x of G.counts.filter(x=>!x.照合 && !(v!=='' && c && x.id===c.id))){
+      await hq('hqCheckCount',{id:x.id,result:'確認済',book:'',hqMemo:''},true); sent=true;
+    }
+  }
   return {n,sent};
+}
+async function deleteCount(gi){
+  const c=jGroups[gi].latest; if(!c) return;
+  const memo=prompt(`${jGroups[gi].store} ${c.日付.slice(5)} ${c.登録日時.slice(11,16)} の有高 ${yen(c.合計)} を削除します。\n理由（任意・例：重複、誤送信）`,'重複');
+  if(memo==null) return;
+  await hq('hqDeleteCount',{id:c.id,hqMemo:memo}); toast('有高を削除しました'); loadJournal();
 }
 async function processGroup(gi){
   const G=jGroups[gi];
