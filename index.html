@@ -350,7 +350,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
 
 <div id="toast"></div>
 <div id="loading">処理中…</div>
-<div id="pv"><div class="h">🔍 <span id="pvTitle">証憑プレビュー</span><button class="btn sm sub" onclick="closePv()">× 閉じる</button></div><div class="b" id="pvBody"></div></div>
+<div id="pv"><div class="h">🔍 <span id="pvTitle">証憑プレビュー</span><button class="btn sm" onclick="printImgs(pvData)">🖨 印刷</button><button class="btn sm sub" onclick="closePv()">× 閉じる</button></div><div class="b" id="pvBody"></div></div>
 <div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="box2"><div style="text-align:right"><button class="btn sm sub" onclick="closeModal()">閉じる</button></div><div id="modalBody"></div></div></div>
 
 <script>
@@ -483,9 +483,9 @@ function drawThumbs(k){
 async function showImages(ids){
   const list=String(ids).split(',').filter(Boolean); if(!list.length) return;
   $('modalBody').innerHTML='読込中…'; $('modal').style.display='flex';
-  let h='';
+  let h='<div style="text-align:right;margin-bottom:4px"><button class="btn sm" onclick="printImgs(mdData)">🖨 印刷</button></div>'; mdData=[];
   for(const id of list){
-    try{ const r=await api('image',{id},true);
+    try{ const r=await getImg(id); mdData.push(r);
       h+= r.dataUrl.startsWith('data:application/pdf') ? `<p><a download="${esc(r.name)}" href="${r.dataUrl}">📄 ${esc(r.name)}</a></p>` : `<img src="${r.dataUrl}" alt="${esc(r.name)}"><p class="muted" style="text-align:center">${esc(r.name)}　<a class="btn sm sub" style="text-decoration:none" download="${esc(r.name)}" href="${r.dataUrl}">⬇ ダウンロード</a></p>`;
     }catch(e){ h+='<p class="ng">画像を取得できませんでした</p>'; }
     $('modalBody').innerHTML=h;
@@ -516,7 +516,21 @@ async function pfNext(){
   pfRunning--; pfNext();
 }
 new MutationObserver(()=>{ clearTimeout(pfTimer); pfTimer=setTimeout(prefetchVisible,400); }).observe(document.body,{childList:true,subtree:true});
-let pvIds='', pvTimer=null, pvHost=null;
+let pvIds='', pvTimer=null, pvHost=null, pvData=[], mdData=[];
+// 画像をそのまま印刷（画面の他の部分は印刷しない）。PDFは別タブで開いて印刷
+function printImgs(list){
+  list=(list||[]).filter(r=>r&&r.dataUrl); if(!list.length) return toast('印刷する画像がありません');
+  const imgs=list.filter(r=>r.dataUrl.startsWith('data:image')), pdfs=list.filter(r=>r.dataUrl.startsWith('data:application/pdf'));
+  pdfs.forEach(r=>{ const bin=atob(r.dataUrl.split(',')[1]), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); window.open(URL.createObjectURL(new Blob([u],{type:'application/pdf'})),'_blank'); });
+  if(!imgs.length) return;
+  const f=document.createElement('iframe'); f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  const d=f.contentWindow.document;
+  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>証憑</title><style>@page{margin:8mm}html,body{margin:0}div{page-break-after:always;text-align:center}div:last-child{page-break-after:auto}img{max-width:100%;max-height:270mm;object-fit:contain}</style></head><body>${imgs.map(r=>`<div><img src="${r.dataUrl}"></div>`).join('')}</body></html>`); d.close();
+  const go=()=>{ f.contentWindow.focus(); f.contentWindow.print(); setTimeout(()=>f.remove(),60000); };
+  const all=[...d.images]; let n=all.filter(i=>!i.complete).length;
+  if(!n) setTimeout(go,100); else all.forEach(i=>{ if(!i.complete) i.onload=i.onerror=()=>{ if(--n===0) go(); }; });
+}
 document.addEventListener('mouseover',e=>{
   if(!canHover || innerWidth<900 || !e.target.closest) return;
   if(e.target.closest('#pv,.modal')) return;
@@ -532,9 +546,9 @@ async function showPv(ids,host){
   $('pv').style.display='flex'; document.body.classList.add('pv-on');
   const list=ids.split(',').filter(Boolean);
   $('pvBody').innerHTML='<p class="muted">読込中…</p>';
-  let h='';
+  let h=''; pvData=[];
   for(const id of list){
-    try{ const r=await getImg(id); if(pvIds!==ids) return;
+    try{ const r=await getImg(id); if(pvIds!==ids) return; pvData.push(r);
       h+= r.dataUrl.startsWith('data:application/pdf') ? `<p><a download="${esc(r.name)}" href="${r.dataUrl}">📄 ${esc(r.name)}（PDF）</a></p>` : `<img src="${r.dataUrl}" alt="${esc(r.name)}">`;
     }catch(e){ if(pvIds!==ids) return; h+='<p class="ng">画像を取得できませんでした</p>'; }
     $('pvBody').innerHTML=h;
