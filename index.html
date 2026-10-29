@@ -335,7 +335,7 @@ td input.s{padding:4px;font-size:13px;min-width:80px}
           <p class="muted">運用開始日（繰越日）と、その日の開始時点の現金残高（移行時の実査額）を設定します。繰越日より前の取引は計算に含めません。</p>
           <div id="carryBox"></div>
           <h2 style="margin-top:22px">本社への定時通知</h2>
-          <p class="muted">毎日決まった時刻に、前回の通知以降に店舗から来た件数（入出金・有高・申請報告）を店舗別に通知します。0件の日は通知しません。</p>
+          <p class="muted">毎日決まった時刻（おすすめ 9:00）に、<b>前日</b>店舗から来た件数（入出金・有高・申請報告）を店舗別に、アプリのURL付きで通知します。前日が0件の日は通知しません。</p>
           <div class="row" style="align-items:flex-end;gap:8px;flex-wrap:wrap">
             <div><label class="f">通知時刻</label><select id="ntHour"></select></div>
             <button class="btn" onclick="saveNotify()">保存</button>
@@ -380,7 +380,7 @@ async function api(action, params, quiet){
     const j = await res.json();
     if(!j.ok) throw new Error(j.error||'エラー');
     return j.data;
-  }catch(e){ toast('エラー: '+e.message,4500); throw e; }
+  }catch(e){ toast('エラー: '+String(e.message).replace(/^COUNT_MISMATCH:/,''),4500); throw e; }
   finally{ if(!quiet) busy(false); }
 }
 const staff = () => $('staff').value.trim();
@@ -708,7 +708,7 @@ function paintKind(){
 function calcRefill(){ const n=num($('rNow').value); if($('rNow').value.trim()!=='') $('rAsk').value=Math.max(0,M.limitMax-n).toLocaleString(); }
 
 function resetPost(keepKind){
-  queue=[]; drawQueue();
+  queue=[]; drawQueue(); diffReasonPending='';
   editing=null; keepImages=[]; pend.ev=[]; pend.cnt=[]; drawThumbs('ev'); drawThumbs('cnt');
   ['pAmount','pPartner','pMemo','cTotal','cInspector','rNow','rAsk','rText','dAmt','dText'].forEach(id=>$(id).value='');
   $('noEv').checked=false; $('cntOcrMsg').textContent=''; $('cntOcrMsg').className='hint'; lastCnt=null; $('pDate').value=today(); dateTouched=false; document.querySelector('input[name=cntMode][value=now]').checked=true;
@@ -726,7 +726,7 @@ async function submitPost(){
     const t=$('cTotal').value.trim();
     if(t==='') { toast('現在有高を入力してください'); return null; }
     if(!pend.cnt.length){ toast('現金有高表の写真を添付してください'); return null; }
-    return {total:num(t),images:pend.cnt,kind:kind==='有高'?$('cKind').value:'通常',inspector:$('cInspector').value.trim()};
+    return {total:num(t),images:pend.cnt,kind:kind==='有高'?$('cKind').value:'通常',inspector:$('cInspector').value.trim(),diffReason:diffReasonPending};
   };
   let msg='投稿しました', cnt=null;
   if(['支払','収受','返納','補充受領'].includes(kind)){
@@ -734,7 +734,8 @@ async function submitPost(){
     else{
       const items=queue.slice();
       if(!(items.length && moneyFormEmpty())){ const p=readMoney(); if(!p) return; items.push(p); }
-      if(document.querySelector('input[name=cntMode]:checked').value==='now'){ cnt=cntPayload(); if(!cnt) return; }
+      if(document.querySelector('input[name=cntMode]:checked').value==='now'){ cnt=cntPayload(); if(!cnt) return;
+        if(!(await countOk(cnt,items[items.length-1].date,items.reduce((a,x)=>a+(IN[x.type]?x.amount:-x.amount),0)))) return; }
       busy(true);
       try{
         for(let i=0;i<items.length;i++){
@@ -750,6 +751,7 @@ async function submitPost(){
   } else if(kind==='有高'){
     cnt=cntPayload(); if(!cnt) return;
     if(cnt.kind==='第三者実査' && !cnt.inspector) return toast('実施者を入力してください');
+    if(!(await countOk(cnt,base.date,0))) return;
     await api('addCount',Object.assign(base,cnt)); msg='有高を報告しました';
   } else if(kind==='補充申請'){
     if($('rNow').value.trim()===''||!(num($('rAsk').value)>0)) return toast('現在残高と申請額を入力してください');
@@ -765,6 +767,29 @@ async function submitPost(){
   resetPost(); refreshAlerts();
 
 }
+/* ===== 有高の差異チェック（アプリ上の残高と合わなければ送れない） ===== */
+let diffReasonPending='';
+async function countOk(cnt,date,extra){
+  if(cnt.diffReason) return true;
+  let r; try{ r=await api('checkCount',{store:store(),date,total:cnt.total,extra}); }catch(e){ return false; }
+  if(r.ok) return true;
+  $('modalBody').innerHTML=`<div class="notice red" style="font-size:15px">⚠ <b>現在の有高（${yen(cnt.total)}）が、アプリ上の残高と一致しません。</b><br>このままでは送信できません。</div>
+   <ol style="line-height:1.9;margin:6px 0 10px 18px;padding:0">
+    <li>もう一度、現金を数え直してください（有高表の記入ミス・計算ミスも確認）</li>
+    <li>支払・収受・補充受領などの<b>投稿漏れ</b>がないか確認してください</li>
+    <li>入力した金額（有高・取引）の打ち間違いがないか確認してください</li>
+   </ol>
+   <p class="muted">数え直しても合わない場合は、状況を書いて「差異報告」と一緒に送ってください（原則4：差異は当日中に報告）。</p>
+   <label class="f">差異の状況（いつ気づいたか・心当たりなど）</label><textarea id="dfR" placeholder="例：数え直しても100円不足。心当たりなし"></textarea>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="closeModal()">数え直す・確認する</button><button class="btn warn" onclick="sendWithDiff()">差異報告と一緒に送る</button></div>`;
+  $('modal').style.display='flex';
+  return false;
+}
+function sendWithDiff(){
+  const v=$('dfR').value.trim(); if(!v) return toast('差異の状況を入力してください');
+  diffReasonPending=v; closeModal(); submitPost();
+}
+
 /* ===== 複数件の投稿（＋もう1件追加） ===== */
 let queue=[];
 function shareTxt(st){ const own=(M.shares||{})[st]||st; const mem=[own].concat(Object.keys(M.shares||{}).filter(k=>M.shares[k]===own)); return mem.length>1?mem.join('・'):''; }
